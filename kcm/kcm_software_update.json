@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Authors": [{ "Name": "Leonie Ain", "Email": "me@koyu.space" }],
+        "Description": "Manage OS image updates",
+        "Icon": "system-software-update",
+        "License": "MIT",
+        "Name": "Software Update",
+        "Version": "1.0"
+    },
+    "X-KDE-System-Settings-Parent-Category": "system-administration",
+    "X-KDE-Weight": "50"
+}

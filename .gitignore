@@ -1,0 +1,13 @@
+# CMake build tree
+build/
+build-*/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.kate-swp
+*.swp
+*~
+
+# RPM packaging working tree
+rpmbuild/

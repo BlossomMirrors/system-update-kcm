@@ -1,0 +1,114 @@
+# German translation for kcm_software_update
+# Copyright (C) 2026 Blossom
+# This file is distributed under the same license as the kcm_software_update package.
+# koyu <me@koyu.space>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: kcm_software_update 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-05-18 00:00+0000\n"
+"PO-Revision-Date: 2025-05-18 00:00+0000\n"
+"Last-Translator: koyu <me@koyu.space>\n"
+"Language-Team: German\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Software Update"
+msgstr "Software-Aktualisierung"
+
+msgid "Update available"
+msgstr "Aktualisierung verfügbar"
+
+msgid "Update tonight"
+msgstr "Heute Nacht aktualisieren"
+
+msgid "Update now"
+msgstr "Jetzt aktualisieren"
+
+msgid "Check for updates"
+msgstr "Auf Aktualisierungen prüfen"
+
+msgid "Your system is up to date."
+msgstr "Dein System ist aktuell."
+
+msgid "Automatic updates"
+msgstr "Automatische Aktualisierungen"
+
+msgid "Previous version"
+msgstr "Vorherige Version"
+
+msgid "Roll back"
+msgstr "Zurücksetzen"
+
+msgid "Roll back and restart"
+msgstr "Zurücksetzen und neu starten"
+
+msgid "Restart now"
+msgstr "Jetzt neu starten"
+
+msgid "Restart later"
+msgstr "Später neu starten"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Update ready"
+msgstr "Aktualisierung bereit"
+
+msgid "Downloading update…"
+msgstr "Aktualisierung wird geladen…"
+
+msgid "Roll back to previous version?"
+msgstr "Auf vorherige Version zurücksetzen?"
+
+msgid "Updates are applied atomically and can always be rolled back. Your files and settings are never affected."
+msgstr "Aktualisierungen werden atomar eingespielt und können jederzeit zurückgesetzt werden. Deine Dateien und Einstellungen bleiben dabei immer erhalten."
+
+msgid "An error occurred"
+msgstr "Ein Fehler ist aufgetreten"
+
+msgid "Transaction log"
+msgstr "Transaktionslog"
+
+msgid "Update scheduled"
+msgstr "Aktualisierung geplant"
+
+msgid "Rollback ready"
+msgstr "Rollback bereit"
+
+msgid "%1 %2 is being downloaded"
+msgstr "%1 %2 wird geladen"
+
+msgid "%1 %2 will be downloaded tonight."
+msgstr "%1 %2 wird heute Nacht heruntergeladen."
+
+msgid "The system will then restart with %1 %2."
+msgstr "Das System startet dann mit %1 %2 neu."
+
+msgid "After the restart the system will run version %1."
+msgstr "Nach dem Neustart läuft das System mit Version %1."
+
+msgid "%1 — Restart required"
+msgstr "%1 — Neustart erforderlich"
+
+msgid "Current"
+msgstr "Aktuell"
+
+msgid "After restart"
+msgstr "Nach Neustart"
+
+msgid "Installed"
+msgstr "Installiert"
+
+msgid "On"
+msgstr "Ein"
+
+msgid "Off"
+msgstr "Aus"
+
+msgid "Your files and settings stay unchanged. You can always update to the latest version again afterwards."
+msgstr "Deine Dateien und Einstellungen bleiben unverändert. Du kannst danach jederzeit wieder auf die neueste Version aktualisieren."
