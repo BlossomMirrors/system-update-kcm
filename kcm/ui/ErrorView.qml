@@ -30,14 +30,15 @@ ColumnLayout {
                 spacing: Kirigami.Units.largeSpacing
 
                 Rectangle {
-                    width: 48; height: 48; radius: 24
+                    width: 56; height: 56; radius: 28
                     color: Qt.rgba(Kirigami.Theme.negativeTextColor.r,
                                    Kirigami.Theme.negativeTextColor.g,
                                    Kirigami.Theme.negativeTextColor.b, 0.18)
                     Kirigami.Icon {
                         anchors.centerIn: parent
-                        source: "dialog-error"
-                        width: 24; height: 24
+                        source: "qrc:/kcm/kcm_software_update/icons/alert-circle.svg"
+                        isMask: true
+                        width: 32; height: 32
                         color: Kirigami.Theme.negativeTextColor
                     }
                 }
@@ -61,15 +62,28 @@ ColumnLayout {
         }
     }
 
-    Item { Layout.fillHeight: true }
-
     RowLayout {
         Layout.fillWidth: true
         Item { Layout.fillWidth: true }
         QQC2.Button {
-            text: i18n("Try again")
-            icon.name: "view-refresh"
+            id: retryBtn
             onClicked: root.retry()
+            contentItem: RowLayout {
+                spacing: Kirigami.Units.smallSpacing
+                Kirigami.Icon {
+                    source: "qrc:/kcm/kcm_software_update/icons/refresh-cw.svg"
+                    isMask: true
+                    color: retryBtn.palette.buttonText
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                }
+                QQC2.Label {
+                    text: i18n("Try again")
+                    color: retryBtn.palette.buttonText
+                }
+            }
         }
     }
+
+    Item { Layout.fillHeight: true }
 }

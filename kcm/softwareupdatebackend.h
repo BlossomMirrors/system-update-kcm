@@ -41,6 +41,7 @@ class SoftwareUpdateBackend : public QObject
     Q_PROPERTY(bool autoUpdateEnabled  READ autoUpdateEnabled NOTIFY autoUpdateEnabledChanged)
     Q_PROPERTY(bool updateAvailable    READ updateAvailable   NOTIFY updateAvailableChanged)
     Q_PROPERTY(bool busy               READ busy              NOTIFY busyChanged)
+    Q_PROPERTY(bool checking           READ checking          NOTIFY checkingChanged)
 
 public:
     explicit SoftwareUpdateBackend(QObject *parent = nullptr);
@@ -55,6 +56,7 @@ public:
     bool autoUpdateEnabled()  const { return m_autoUpdateEnabled; }
     bool updateAvailable()    const { return m_updateAvailable; }
     bool busy()               const { return m_busy; }
+    bool checking()           const { return m_checking; }
 
     Q_INVOKABLE void startUpgrade();
     Q_INVOKABLE void scheduleUpgrade();
@@ -77,6 +79,7 @@ Q_SIGNALS:
     void autoUpdateEnabledChanged();
     void updateAvailableChanged();
     void busyChanged();
+    void checkingChanged();
 
 private Q_SLOTS:
     void onTxnMessage(const QString &msg);
@@ -92,6 +95,7 @@ private:
     void setAutoUpdateEnabled(bool v);
     void setUpdateAvailable(bool v);
     void setBusy(bool v);
+    void setChecking(bool v);
 
     void fetchDeployments();
     void readAutoUpdateState();
@@ -107,6 +111,7 @@ private:
     bool    m_autoUpdateEnabled = false;
     bool    m_updateAvailable   = false;
     bool    m_busy              = false;
+    bool    m_checking          = false;
     bool    m_txnIsRollback     = false;
 
     QString              m_txnConnectionName;

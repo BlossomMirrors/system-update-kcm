@@ -34,15 +34,16 @@ ColumnLayout {
                 spacing: Kirigami.Units.largeSpacing
 
                 Rectangle {
-                    width: 48; height: 48
-                    radius: 24
+                    width: 56; height: 56
+                    radius: 28
                     color: Qt.rgba(Kirigami.Theme.neutralTextColor.r,
                                    Kirigami.Theme.neutralTextColor.g,
                                    Kirigami.Theme.neutralTextColor.b, 0.18)
                     Kirigami.Icon {
                         anchors.centerIn: parent
-                        source: "edit-undo-history"
-                        width: 24; height: 24
+                        source: "qrc:/kcm/kcm_software_update/icons/rotate-ccw.svg"
+                        isMask: true
+                        width: 32; height: 32
                         color: Kirigami.Theme.neutralTextColor
                     }
                 }

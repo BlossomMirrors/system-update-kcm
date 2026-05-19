@@ -24,6 +24,22 @@ qt_add_qml_module(kcm_software_update
         ui/InfoRow.qml
 )
 
+qt_add_resources(kcm_software_update "kcm_icons"
+    PREFIX "/kcm/kcm_software_update"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}"
+    FILES
+        icons/monitor.svg
+        icons/check.svg
+        icons/download.svg
+        icons/clock.svg
+        icons/rotate-ccw.svg
+        icons/alert-circle.svg
+        icons/refresh-cw.svg
+        icons/chevron-down.svg
+        icons/chevron-right.svg
+        icons/x.svg
+)
+
 qt_add_resources(kcm_software_update "qml_kcm_path"
     PREFIX "/kcm/kcm_software_update"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/ui"

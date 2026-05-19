@@ -11,7 +11,7 @@ ColumnLayout {
 
     spacing: Kirigami.Units.largeSpacing
 
-    // Top card: OS name + version + action buttons
+    // Merged top card: header row + divider + description
     Rectangle {
         Layout.fillWidth: true
         color: Kirigami.Theme.backgroundColor
@@ -20,79 +20,77 @@ ColumnLayout {
                               Kirigami.Theme.textColor.b, 0.12)
         border.width: 1
         radius: Kirigami.Units.largeSpacing
-        implicitHeight: headerRow.implicitHeight + Kirigami.Units.gridUnit * 2
+        implicitHeight: topCardCol.implicitHeight + Kirigami.Units.gridUnit * 2
 
-        RowLayout {
-            id: headerRow
+        ColumnLayout {
+            id: topCardCol
             anchors {
                 left: parent.left; right: parent.right; top: parent.top
                 margins: Kirigami.Units.gridUnit
             }
-            spacing: Kirigami.Units.largeSpacing
+            spacing: 0
 
-            Rectangle {
-                width: 48; height: 48; radius: 24
-                color: Qt.rgba(Kirigami.Theme.highlightColor.r,
-                               Kirigami.Theme.highlightColor.g,
-                               Kirigami.Theme.highlightColor.b, 0.18)
-                Kirigami.Icon {
-                    anchors.centerIn: parent
-                    source: "computer-symbolic"
-                    width: 24; height: 24
-                    color: Kirigami.Theme.highlightColor
-                }
-            }
-
-            ColumnLayout {
+            RowLayout {
                 Layout.fillWidth: true
-                spacing: 2
-                QQC2.Label {
-                    text: backend.osName
-                    font.bold: true
-                    font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.1)
+                spacing: Kirigami.Units.largeSpacing
+
+                Rectangle {
+                    width: 56; height: 56; radius: 28
+                    color: Qt.rgba(Kirigami.Theme.highlightColor.r,
+                                   Kirigami.Theme.highlightColor.g,
+                                   Kirigami.Theme.highlightColor.b, 0.18)
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        source: "qrc:/kcm/kcm_software_update/icons/monitor.svg"
+                        isMask: true
+                        width: 32; height: 32
+                        color: Kirigami.Theme.highlightColor
+                    }
                 }
-                QQC2.Label {
-                    text: i18n("Version %1 — 1.2 GB", backend.pendingVersion)
-                    opacity: 0.7
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    QQC2.Label {
+                        text: backend.osName
+                        font.bold: true
+                        font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.1)
+                    }
+                    QQC2.Label {
+                        text: i18n("Version %1", backend.pendingVersion)
+                        opacity: 0.7
+                    }
+                }
+
+                RowLayout {
+                    spacing: Kirigami.Units.smallSpacing
+                    QQC2.Button {
+                        text: i18n("Update tonight")
+                        onClicked: {
+                            backend.scheduleUpgrade()
+                            root.requestScheduled()
+                        }
+                    }
+                    QQC2.Button {
+                        text: i18n("Update now")
+                        highlighted: true
+                        onClicked: backend.startUpgrade()
+                    }
                 }
             }
 
-            QQC2.Button {
-                text: i18n("Update tonight")
-                onClicked: {
-                    backend.scheduleUpgrade()
-                    root.requestScheduled()
-                }
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                Layout.topMargin: Kirigami.Units.gridUnit
+                Layout.bottomMargin: Kirigami.Units.gridUnit
             }
 
-            QQC2.Button {
-                text: i18n("Update now")
-                highlighted: true
-                onClicked: backend.startUpgrade()
+            QQC2.Label {
+                Layout.fillWidth: true
+                text: i18n("This update contains security updates, bug fixes and updated packages for %1. After downloading, the update will be applied on the next restart.", backend.osName)
+                wrapMode: Text.WordWrap
+                opacity: 0.85
             }
-        }
-    }
-
-    // Description card
-    Rectangle {
-        Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: descLabel.implicitHeight + Kirigami.Units.gridUnit * 2
-
-        QQC2.Label {
-            id: descLabel
-            anchors {
-                left: parent.left; right: parent.right; top: parent.top
-                margins: Kirigami.Units.gridUnit
-            }
-            text: i18n("This update contains security updates, bug fixes and updated packages for %1.\nAfter downloading, the update will be applied on the next restart.", backend.osName)
-            wrapMode: Text.WordWrap
-            opacity: 0.85
         }
     }
 
@@ -127,8 +125,9 @@ ColumnLayout {
                         opacity: 0.7
                     }
                     QQC2.Switch {
-                        checked: backend.autoUpdateEnabled
+                        id: autoUpdateSwitch
                         onToggled: backend.setAutoUpdate(checked)
+                        Binding on checked { value: backend.autoUpdateEnabled }
                     }
                 }
             }
@@ -152,7 +151,9 @@ ColumnLayout {
     // Disclaimer
     Rectangle {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
+        color: Qt.rgba(Kirigami.Theme.textColor.r,
+                       Kirigami.Theme.textColor.g,
+                       Kirigami.Theme.textColor.b, 0.05)
         border.color: Qt.rgba(Kirigami.Theme.textColor.r,
                               Kirigami.Theme.textColor.g,
                               Kirigami.Theme.textColor.b, 0.12)

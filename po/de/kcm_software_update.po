@@ -18,7 +18,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "Software Update"
-msgstr "Software-Aktualisierung"
+msgstr "Softwareaktualisierungen"
 
 msgid "Update available"
 msgstr "Aktualisierung verfügbar"

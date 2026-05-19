@@ -55,8 +55,21 @@ SoftwareUpdateBackend::~SoftwareUpdateBackend()
 
 void SoftwareUpdateBackend::checkForUpdates()
 {
+    setChecking(true);
     fetchDeployments();
     readAutoUpdateState();
+}
+
+// Build a system-bus method call with interactive Polkit authorization enabled.
+static QDBusPendingCall authCall(const char *service, const char *path,
+                                 const char *iface, const QString &method,
+                                 const QVariantList &args = {})
+{
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QLatin1String(service), QLatin1String(path), QLatin1String(iface), method);
+    msg.setArguments(args);
+    msg.setInteractiveAuthorizationAllowed(true);
+    return QDBusConnection::systemBus().asyncCall(msg);
 }
 
 void SoftwareUpdateBackend::startUpgrade()
@@ -66,15 +79,11 @@ void SoftwareUpdateBackend::startUpgrade()
     setProgressPercent(0);
     setProgressMessage(QString());
 
-    auto *iface = new QDBusInterface(
-        QLatin1String(RPMOSTREE_SERVICE), QLatin1String(RPMOSTREE_OS_PATH),
-        QLatin1String(RPMOSTREE_OS_IFACE), QDBusConnection::systemBus(), this);
-
     auto *w = new QDBusPendingCallWatcher(
-        iface->asyncCall(QStringLiteral("Upgrade"), QVariantMap{}), this);
+        authCall(RPMOSTREE_SERVICE, RPMOSTREE_OS_PATH, RPMOSTREE_OS_IFACE,
+                 QStringLiteral("Upgrade"), {QVariant::fromValue(QVariantMap{})}), this);
 
-    connect(w, &QDBusPendingCallWatcher::finished, this, [this, iface](QDBusPendingCallWatcher *watcher) {
-        iface->deleteLater();
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
         watcher->deleteLater();
         QDBusPendingReply<QString> reply = *watcher;
         if (reply.isError()) {
@@ -94,15 +103,11 @@ void SoftwareUpdateBackend::startRollback()
     setProgressPercent(0);
     setProgressMessage(QString());
 
-    auto *iface = new QDBusInterface(
-        QLatin1String(RPMOSTREE_SERVICE), QLatin1String(RPMOSTREE_OS_PATH),
-        QLatin1String(RPMOSTREE_OS_IFACE), QDBusConnection::systemBus(), this);
-
     auto *w = new QDBusPendingCallWatcher(
-        iface->asyncCall(QStringLiteral("Rollback"), QVariantMap{}), this);
+        authCall(RPMOSTREE_SERVICE, RPMOSTREE_OS_PATH, RPMOSTREE_OS_IFACE,
+                 QStringLiteral("Rollback"), {QVariant::fromValue(QVariantMap{})}), this);
 
-    connect(w, &QDBusPendingCallWatcher::finished, this, [this, iface](QDBusPendingCallWatcher *watcher) {
-        iface->deleteLater();
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
         watcher->deleteLater();
         QDBusPendingReply<QString> reply = *watcher;
         if (reply.isError()) {
@@ -130,32 +135,65 @@ void SoftwareUpdateBackend::cancelUpgrade()
 
 void SoftwareUpdateBackend::setAutoUpdate(bool enabled)
 {
-    auto *mgr = new QDBusInterface(
-        QLatin1String(SYSTEMD_SERVICE), QLatin1String(SYSTEMD_PATH),
-        QLatin1String(SYSTEMD_MGR_IFACE), QDBusConnection::systemBus(), this);
-
-    QDBusPendingCall call = enabled
-        ? mgr->asyncCall(QStringLiteral("EnableUnitFiles"),
-                         QStringList{QLatin1String(TIMER_UNIT)}, false, true)
-        : mgr->asyncCall(QStringLiteral("DisableUnitFiles"),
-                         QStringList{QLatin1String(TIMER_UNIT)}, false);
-
-    auto *w = new QDBusPendingCallWatcher(call, this);
-    connect(w, &QDBusPendingCallWatcher::finished, this, [this, mgr, enabled](QDBusPendingCallWatcher *watcher) {
-        watcher->deleteLater();
-        if (watcher->isError()) {
-            mgr->deleteLater();
-            Q_EMIT errorOccurred(watcher->error().message());
-            return;
-        }
-        auto *rw = new QDBusPendingCallWatcher(
-            mgr->asyncCall(QStringLiteral("Reload")), this);
-        connect(rw, &QDBusPendingCallWatcher::finished, this, [this, mgr, enabled](QDBusPendingCallWatcher *rw2) {
-            mgr->deleteLater();
-            rw2->deleteLater();
-            setAutoUpdateEnabled(enabled);
+    if (enabled) {
+        QVariantList enableArgs = { QVariant(QStringList{QLatin1String(TIMER_UNIT)}),
+                                    QVariant(false), QVariant(true) };
+        auto *w = new QDBusPendingCallWatcher(
+            authCall(SYSTEMD_SERVICE, SYSTEMD_PATH, SYSTEMD_MGR_IFACE,
+                     QStringLiteral("EnableUnitFiles"), enableArgs), this);
+        connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
+            watcher->deleteLater();
+            if (watcher->isError()) {
+                Q_EMIT errorOccurred(watcher->error().message());
+                readAutoUpdateState();
+                return;
+            }
+            auto *rw = new QDBusPendingCallWatcher(
+                authCall(SYSTEMD_SERVICE, SYSTEMD_PATH, SYSTEMD_MGR_IFACE,
+                         QStringLiteral("Reload")), this);
+            connect(rw, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *rw2) {
+                rw2->deleteLater();
+                QVariantList startArgs = { QVariant(QLatin1String(TIMER_UNIT)),
+                                           QVariant(QStringLiteral("replace")) };
+                auto *sw = new QDBusPendingCallWatcher(
+                    authCall(SYSTEMD_SERVICE, SYSTEMD_PATH, SYSTEMD_MGR_IFACE,
+                             QStringLiteral("StartUnit"), startArgs), this);
+                connect(sw, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *sw2) {
+                    sw2->deleteLater();
+                    readAutoUpdateState();
+                });
+            });
         });
-    });
+    } else {
+        QVariantList stopArgs = { QVariant(QLatin1String(TIMER_UNIT)),
+                                  QVariant(QStringLiteral("replace")) };
+        auto *w = new QDBusPendingCallWatcher(
+            authCall(SYSTEMD_SERVICE, SYSTEMD_PATH, SYSTEMD_MGR_IFACE,
+                     QStringLiteral("StopUnit"), stopArgs), this);
+        connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
+            watcher->deleteLater();
+            if (watcher->isError()) {
+                Q_EMIT errorOccurred(watcher->error().message());
+                readAutoUpdateState();
+                return;
+            }
+            QVariantList disableArgs = { QVariant(QStringList{QLatin1String(TIMER_UNIT)}),
+                                         QVariant(false) };
+            auto *rw = new QDBusPendingCallWatcher(
+                authCall(SYSTEMD_SERVICE, SYSTEMD_PATH, SYSTEMD_MGR_IFACE,
+                         QStringLiteral("DisableUnitFiles"), disableArgs), this);
+            connect(rw, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *rw2) {
+                rw2->deleteLater();
+                auto *sw = new QDBusPendingCallWatcher(
+                    authCall(SYSTEMD_SERVICE, SYSTEMD_PATH, SYSTEMD_MGR_IFACE,
+                             QStringLiteral("Reload")), this);
+                connect(sw, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *sw2) {
+                    sw2->deleteLater();
+                    readAutoUpdateState();
+                });
+            });
+        });
+    }
 }
 
 void SoftwareUpdateBackend::fetchDeployments()
@@ -175,17 +213,19 @@ void SoftwareUpdateBackend::fetchDeployments()
         iface->deleteLater();
         watcher->deleteLater();
         if (watcher->isError()) {
+            setChecking(false);
             Q_EMIT errorOccurred(watcher->error().message());
             return;
         }
 
         QDBusPendingReply<QDBusVariant> reply = *watcher;
         if (reply.isError()) {
+            setChecking(false);
             Q_EMIT errorOccurred(reply.error().message());
             return;
         }
 
-        // Unwrap QDBusVariant → aa{sv} via QDBusArgument
+        // Unwrap QDBusVariant: aa{sv} via QDBusArgument
         const QDBusArgument outerArg =
             qvariant_cast<QDBusArgument>(reply.value().variant());
 
@@ -198,22 +238,36 @@ void SoftwareUpdateBackend::fetchDeployments()
         }
         outerArg.endArray();
 
+        // Extract the container image digest from base-commit-meta (nested a{sv}).
+        auto imageDigest = [](const QVariantMap &dep) -> QString {
+            const QVariant v = dep.value(QStringLiteral("base-commit-meta"));
+            if (!v.canConvert<QDBusArgument>()) return {};
+            QVariantMap meta;
+            qvariant_cast<QDBusArgument>(v) >> meta;
+            return meta.value(QStringLiteral("ostree.manifest-digest")).toString();
+        };
+
         QString current, pending, previous;
+        QString bootedDigest, pendingDigest;
         for (const auto &dep : std::as_const(deployments)) {
             const QString version = dep.value(QStringLiteral("version")).toString();
             const bool booted     = dep.value(QStringLiteral("booted")).toBool();
             const bool staged     = dep.value(QStringLiteral("staged")).toBool();
-            if (booted && current.isEmpty())
+            if (booted && current.isEmpty()) {
                 current = version;
-            else if (staged && pending.isEmpty())
+                bootedDigest = imageDigest(dep);
+            } else if (staged && pending.isEmpty()) {
                 pending = version;
-            else if (!booted && !staged && previous.isEmpty())
+                pendingDigest = imageDigest(dep);
+            } else if (!booted && !staged && previous.isEmpty()) {
                 previous = version;
+            }
         }
         setCurrentVersion(current);
         setPendingVersion(pending);
         setPreviousVersion(previous);
-        setUpdateAvailable(!pending.isEmpty());
+        setUpdateAvailable(!pending.isEmpty() && pendingDigest != bootedDigest);
+        setChecking(false);
     });
 }
 
@@ -365,4 +419,11 @@ void SoftwareUpdateBackend::setBusy(bool v)
     if (m_busy == v) return;
     m_busy = v;
     Q_EMIT busyChanged();
+}
+
+void SoftwareUpdateBackend::setChecking(bool v)
+{
+    if (m_checking == v) return;
+    m_checking = v;
+    Q_EMIT checkingChanged();
 }

@@ -26,14 +26,15 @@ ColumnLayout {
             spacing: Kirigami.Units.largeSpacing
 
             Rectangle {
-                width: 48; height: 48; radius: 24
+                width: 56; height: 56; radius: 28
                 color: Qt.rgba(Kirigami.Theme.highlightColor.r,
                                Kirigami.Theme.highlightColor.g,
                                Kirigami.Theme.highlightColor.b, 0.18)
                 Kirigami.Icon {
                     anchors.centerIn: parent
-                    source: "clock"
-                    width: 24; height: 24
+                    source: "qrc:/kcm/kcm_software_update/icons/clock.svg"
+                    isMask: true
+                    width: 32; height: 32
                     color: Kirigami.Theme.highlightColor
                 }
             }
@@ -67,7 +68,9 @@ ColumnLayout {
 
     Rectangle {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
+        color: Qt.rgba(Kirigami.Theme.textColor.r,
+                       Kirigami.Theme.textColor.g,
+                       Kirigami.Theme.textColor.b, 0.05)
         border.color: Qt.rgba(Kirigami.Theme.textColor.r,
                               Kirigami.Theme.textColor.g,
                               Kirigami.Theme.textColor.b, 0.12)

@@ -36,15 +36,16 @@ ColumnLayout {
                 spacing: Kirigami.Units.largeSpacing
 
                 Rectangle {
-                    width: 48; height: 48
-                    radius: 24
+                    width: 56; height: 56
+                    radius: 28
                     color: Qt.rgba(Kirigami.Theme.positiveTextColor.r,
                                    Kirigami.Theme.positiveTextColor.g,
                                    Kirigami.Theme.positiveTextColor.b, 0.18)
                     Kirigami.Icon {
                         anchors.centerIn: parent
-                        source: "checkmark"
-                        width: 24; height: 24
+                        source: "qrc:/kcm/kcm_software_update/icons/check.svg"
+                        isMask: true
+                        width: 32; height: 32
                         color: Kirigami.Theme.positiveTextColor
                     }
                 }
@@ -121,9 +122,18 @@ ColumnLayout {
                     spacing: Kirigami.Units.smallSpacing
                     property bool logExpanded: false
 
+                    TapHandler {
+                        cursorShape: Qt.PointingHandCursor
+                        onTapped: logHeader.logExpanded = !logHeader.logExpanded
+                    }
+
                     Kirigami.Icon {
-                        source: logHeader.logExpanded ? "go-down" : "go-next"
-                        width: 16; height: 16
+                        source: logHeader.logExpanded
+                            ? "qrc:/kcm/kcm_software_update/icons/chevron-down.svg"
+                            : "qrc:/kcm/kcm_software_update/icons/chevron-right.svg"
+                        isMask: true
+                        width: 14; height: 14
+                        color: Kirigami.Theme.textColor
                         opacity: 0.7
                     }
                     QQC2.Label {
@@ -131,11 +141,6 @@ ColumnLayout {
                         opacity: 0.7
                     }
                     Item { Layout.fillWidth: true }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: logHeader.logExpanded = !logHeader.logExpanded
-                    }
                 }
 
                 QQC2.ScrollView {
@@ -158,8 +163,6 @@ ColumnLayout {
         }
     }
 
-    Item { Layout.fillHeight: true }
-
     RowLayout {
         Layout.fillWidth: true
         Item { Layout.fillWidth: true }
@@ -176,4 +179,6 @@ ColumnLayout {
             }
         }
     }
+
+    Item { Layout.fillHeight: true }
 }

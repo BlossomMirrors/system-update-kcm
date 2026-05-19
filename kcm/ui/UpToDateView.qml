@@ -18,44 +18,79 @@ ColumnLayout {
                               Kirigami.Theme.textColor.b, 0.12)
         border.width: 1
         radius: Kirigami.Units.largeSpacing
-        implicitHeight: headerRow.implicitHeight + Kirigami.Units.gridUnit * 2
+        implicitHeight: headerCol.implicitHeight + Kirigami.Units.gridUnit * 2
 
-        RowLayout {
-            id: headerRow
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Kirigami.Units.gridUnit }
-            spacing: Kirigami.Units.largeSpacing
-
-            Rectangle {
-                width: 48; height: 48; radius: 24
-                color: Qt.rgba(Kirigami.Theme.positiveTextColor.r,
-                               Kirigami.Theme.positiveTextColor.g,
-                               Kirigami.Theme.positiveTextColor.b, 0.18)
-                Kirigami.Icon {
-                    anchors.centerIn: parent
-                    source: "security-high"
-                    width: 24; height: 24
-                    color: Kirigami.Theme.positiveTextColor
-                }
+        ColumnLayout {
+            id: headerCol
+            anchors {
+                left: parent.left; right: parent.right; top: parent.top
+                margins: Kirigami.Units.gridUnit
             }
+            spacing: 0
 
-            ColumnLayout {
+            RowLayout {
                 Layout.fillWidth: true
-                spacing: 2
-                QQC2.Label {
-                    text: backend.osName
-                    font.bold: true
-                    font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.1)
-                }
-                QQC2.Label {
-                    text: i18n("Your system is up to date.")
-                    opacity: 0.7
-                }
-            }
+                spacing: Kirigami.Units.largeSpacing
 
-            QQC2.Button {
-                text: i18n("Check for updates")
-                icon.name: "view-refresh"
-                onClicked: backend.checkForUpdates()
+                Rectangle {
+                    width: 56; height: 56; radius: 28
+                    color: Qt.rgba(Kirigami.Theme.positiveTextColor.r,
+                                   Kirigami.Theme.positiveTextColor.g,
+                                   Kirigami.Theme.positiveTextColor.b, 0.18)
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        source: "qrc:/kcm/kcm_software_update/icons/check.svg"
+                        isMask: true
+                        width: 32; height: 32
+                        color: Kirigami.Theme.positiveTextColor
+                    }
+                }
+
+                ColumnLayout {
+                    spacing: 2
+                    QQC2.Label {
+                        text: backend.osName
+                        font.bold: true
+                        font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.1)
+                    }
+                    QQC2.Label {
+                        text: i18n("Your system is up to date.")
+                        opacity: 0.7
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                QQC2.Button {
+                    id: checkBtn
+                    highlighted: true
+                    enabled: !backend.checking
+                    leftPadding: Kirigami.Units.largeSpacing
+                    rightPadding: Kirigami.Units.largeSpacing
+                    onClicked: backend.checkForUpdates()
+                    contentItem: RowLayout {
+                        spacing: Kirigami.Units.smallSpacing
+                        QQC2.BusyIndicator {
+                            visible: backend.checking
+                            running: backend.checking
+                            padding: 0
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                        }
+                        Kirigami.Icon {
+                            visible: !backend.checking
+                            source: "qrc:/kcm/kcm_software_update/icons/refresh-cw.svg"
+                            isMask: true
+                            color: checkBtn.palette.buttonText
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                        }
+                        QQC2.Label {
+                            text: backend.checking ? i18n("Checking…") : i18n("Check for updates")
+                            color: checkBtn.palette.buttonText
+                        }
+                    }
+                }
             }
         }
     }
@@ -90,8 +125,9 @@ ColumnLayout {
                         opacity: 0.7
                     }
                     QQC2.Switch {
-                        checked: backend.autoUpdateEnabled
+                        id: autoUpdateSwitch
                         onToggled: backend.setAutoUpdate(checked)
+                        Binding on checked { value: backend.autoUpdateEnabled }
                     }
                 }
             }
@@ -114,7 +150,9 @@ ColumnLayout {
 
     Rectangle {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
+        color: Qt.rgba(Kirigami.Theme.textColor.r,
+                       Kirigami.Theme.textColor.g,
+                       Kirigami.Theme.textColor.b, 0.05)
         border.color: Qt.rgba(Kirigami.Theme.textColor.r,
                               Kirigami.Theme.textColor.g,
                               Kirigami.Theme.textColor.b, 0.12)

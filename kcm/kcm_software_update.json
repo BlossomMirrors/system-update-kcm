@@ -5,6 +5,7 @@
         "Icon": "system-software-update",
         "License": "MIT",
         "Name": "Software Update",
+        "Name[de]": "Softwareaktualisierungen",
         "Version": "1.0"
     },
     "X-KDE-System-Settings-Parent-Category": "system-administration",

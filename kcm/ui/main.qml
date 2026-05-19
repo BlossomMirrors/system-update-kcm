@@ -39,7 +39,10 @@ KCMUtils.SimpleKCM {
     // Drives view transitions via state machine so we never push/pop on SimpleKCM
     Item {
         id: mainLoader
-        anchors.fill: parent
+        anchors {
+            fill: parent
+            margins: 20
+        }
         state: "auto"
 
         states: [

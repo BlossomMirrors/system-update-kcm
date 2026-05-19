@@ -27,15 +27,16 @@ ColumnLayout {
             spacing: Kirigami.Units.largeSpacing
 
             Rectangle {
-                width: 48; height: 48
-                radius: 24
+                width: 56; height: 56
+                radius: 28
                 color: Qt.rgba(Kirigami.Theme.positiveTextColor.r,
                                Kirigami.Theme.positiveTextColor.g,
                                Kirigami.Theme.positiveTextColor.b, 0.18)
                 Kirigami.Icon {
                     anchors.centerIn: parent
-                    source: "checkmark"
-                    width: 24; height: 24
+                    source: "qrc:/kcm/kcm_software_update/icons/check.svg"
+                    isMask: true
+                    width: 32; height: 32
                     color: Kirigami.Theme.positiveTextColor
                 }
             }
@@ -59,8 +60,6 @@ ColumnLayout {
         }
     }
 
-    Item { Layout.fillHeight: true }
-
     RowLayout {
         Layout.fillWidth: true
         Item { Layout.fillWidth: true }
@@ -76,4 +75,6 @@ ColumnLayout {
             onClicked: { /* systemctl reboot */ }
         }
     }
+
+    Item { Layout.fillHeight: true }
 }
