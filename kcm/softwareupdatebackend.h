@@ -4,6 +4,7 @@
 #include <QDBusPendingReply>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantMap>
 #include <qqmlintegration.h>
 
@@ -42,6 +43,8 @@ class SoftwareUpdateBackend : public QObject
     Q_PROPERTY(bool updateAvailable    READ updateAvailable   NOTIFY updateAvailableChanged)
     Q_PROPERTY(bool busy               READ busy              NOTIFY busyChanged)
     Q_PROPERTY(bool checking           READ checking          NOTIFY checkingChanged)
+    Q_PROPERTY(bool resetting          READ resetting         NOTIFY resettingChanged)
+    Q_PROPERTY(QStringList layeredPackages READ layeredPackages NOTIFY layeredPackagesChanged)
 
 public:
     explicit SoftwareUpdateBackend(QObject *parent = nullptr);
@@ -57,6 +60,8 @@ public:
     bool updateAvailable()    const { return m_updateAvailable; }
     bool busy()               const { return m_busy; }
     bool checking()           const { return m_checking; }
+    bool resetting()          const { return m_resetting; }
+    QStringList layeredPackages() const { return m_layeredPackages; }
 
     Q_INVOKABLE void startUpgrade();
     Q_INVOKABLE void scheduleUpgrade();
@@ -65,6 +70,7 @@ public:
     Q_INVOKABLE void setAutoUpdate(bool enabled);
     Q_INVOKABLE void checkForUpdates();
     Q_INVOKABLE void rebootSystem();
+    Q_INVOKABLE void startReset();
 
 Q_SIGNALS:
     void upgradeFinished(bool success);
@@ -81,6 +87,8 @@ Q_SIGNALS:
     void updateAvailableChanged();
     void busyChanged();
     void checkingChanged();
+    void resettingChanged();
+    void layeredPackagesChanged();
 
 private Q_SLOTS:
     void onTxnMessage(const QString &msg);
@@ -88,6 +96,8 @@ private Q_SLOTS:
     void onTxnFinished(bool success, const QString &errorMessage);
 
 private:
+    enum class TxnKind { Upgrade, Rollback, Reset };
+
     void setCurrentVersion(const QString &v);
     void setPendingVersion(const QString &v);
     void setPreviousVersion(const QString &v);
@@ -97,10 +107,12 @@ private:
     void setUpdateAvailable(bool v);
     void setBusy(bool v);
     void setChecking(bool v);
+    void setResetting(bool v);
+    void setLayeredPackages(const QStringList &v);
 
     void fetchDeployments();
     void readAutoUpdateState();
-    void beginTransaction(const QString &address, bool isRollback);
+    void beginTransaction(const QString &address, TxnKind kind);
     void cleanupTransaction();
 
     QString m_osName;
@@ -113,7 +125,9 @@ private:
     bool    m_updateAvailable   = false;
     bool    m_busy              = false;
     bool    m_checking          = false;
-    bool    m_txnIsRollback     = false;
+    bool    m_resetting         = false;
+    QStringList m_layeredPackages;
+    TxnKind m_txnKind           = TxnKind::Upgrade;
 
     QString              m_txnConnectionName;
     RpmOstreeTransaction *m_txnIface = nullptr;

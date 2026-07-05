@@ -92,7 +92,7 @@ void SoftwareUpdateBackend::startUpgrade()
             Q_EMIT upgradeFinished(false);
             return;
         }
-        beginTransaction(reply.value(), false);
+        beginTransaction(reply.value(), TxnKind::Upgrade);
     });
 }
 
@@ -116,7 +116,42 @@ void SoftwareUpdateBackend::startRollback()
             Q_EMIT rollbackFinished(false);
             return;
         }
-        beginTransaction(reply.value(), true);
+        beginTransaction(reply.value(), TxnKind::Rollback);
+    });
+}
+
+void SoftwareUpdateBackend::startReset()
+{
+    if (m_busy) return;
+    setBusy(true);
+    setResetting(true);
+    setProgressPercent(0);
+    setProgressMessage(QString());
+
+    // Same options the rpm-ostree reset CLI passes to UpdateDeployment
+    const QVariantMap options{
+        {QStringLiteral("no-pull-base"), true},
+        {QStringLiteral("cache-only"), true},
+        {QStringLiteral("no-layering"), true},
+        {QStringLiteral("no-overrides"), true},
+        {QStringLiteral("no-initramfs"), true},
+    };
+
+    auto *w = new QDBusPendingCallWatcher(
+        authCall(RPMOSTREE_SERVICE, RPMOSTREE_OS_PATH, RPMOSTREE_OS_IFACE,
+                 QStringLiteral("UpdateDeployment"),
+                 {QVariant::fromValue(QVariantMap{}), QVariant::fromValue(options)}), this);
+
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
+        watcher->deleteLater();
+        QDBusPendingReply<QString> reply = *watcher;
+        if (reply.isError()) {
+            Q_EMIT errorOccurred(reply.error().message());
+            setBusy(false);
+            setResetting(false);
+            return;
+        }
+        beginTransaction(reply.value(), TxnKind::Reset);
     });
 }
 
@@ -131,6 +166,7 @@ void SoftwareUpdateBackend::cancelUpgrade()
         m_txnIface->cancel();
     cleanupTransaction();
     setBusy(false);
+    setResetting(false);
 }
 
 void SoftwareUpdateBackend::setAutoUpdate(bool enabled)
@@ -260,8 +296,26 @@ void SoftwareUpdateBackend::fetchDeployments()
             return meta.value(QStringLiteral("ostree.manifest-digest")).toString();
         };
 
+        auto stringList = [](const QVariant &v) -> QStringList {
+            if (v.canConvert<QDBusArgument>()) {
+                QStringList l;
+                qvariant_cast<QDBusArgument>(v) >> l;
+                return l;
+            }
+            return v.toStringList();
+        };
+
+        auto layeredOf = [&stringList](const QVariantMap &dep) {
+            QStringList l = stringList(dep.value(QStringLiteral("packages")))
+                          + stringList(dep.value(QStringLiteral("requested-local-packages")));
+            l.removeDuplicates();
+            return l;
+        };
+
         QString current, pending, previous;
         QString bootedDigest, pendingDigest;
+        QStringList layeredBooted, layeredStaged;
+        bool hasStaged = false;
         for (const auto &dep : std::as_const(deployments)) {
             const QString version = dep.value(QStringLiteral("version")).toString();
             const bool booted     = dep.value(QStringLiteral("booted")).toBool();
@@ -269,9 +323,12 @@ void SoftwareUpdateBackend::fetchDeployments()
             if (booted && current.isEmpty()) {
                 current = version;
                 bootedDigest = imageDigest(dep);
+                layeredBooted = layeredOf(dep);
             } else if (staged && pending.isEmpty()) {
                 pending = version;
                 pendingDigest = imageDigest(dep);
+                layeredStaged = layeredOf(dep);
+                hasStaged = true;
             } else if (!booted && !staged && previous.isEmpty()) {
                 previous = version;
             }
@@ -279,6 +336,8 @@ void SoftwareUpdateBackend::fetchDeployments()
         setCurrentVersion(current);
         setPendingVersion(pending);
         setPreviousVersion(previous);
+        // The staged deployment reflects what the next boot and future updates use
+        setLayeredPackages(hasStaged ? layeredStaged : layeredBooted);
         setUpdateAvailable(!pending.isEmpty() && pendingDigest != bootedDigest);
         setChecking(false);
     });
@@ -307,18 +366,19 @@ void SoftwareUpdateBackend::readAutoUpdateState()
     });
 }
 
-void SoftwareUpdateBackend::beginTransaction(const QString &address, bool isRollback)
+void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kind)
 {
     cleanupTransaction();
-    m_txnIsRollback = isRollback;
+    m_txnKind = kind;
 
     QDBusConnection conn =
         QDBusConnection::connectToPeer(address, QLatin1String(TXN_CONN_NAME));
     if (!conn.isConnected()) {
         Q_EMIT errorOccurred(i18n("Failed to connect to rpm-ostree transaction"));
         setBusy(false);
-        if (isRollback) Q_EMIT rollbackFinished(false);
-        else            Q_EMIT upgradeFinished(false);
+        setResetting(false);
+        if (kind == TxnKind::Rollback)     Q_EMIT rollbackFinished(false);
+        else if (kind == TxnKind::Upgrade) Q_EMIT upgradeFinished(false);
         return;
     }
     m_txnConnectionName = QLatin1String(TXN_CONN_NAME);
@@ -363,16 +423,26 @@ void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMess
         Q_EMIT errorOccurred(errorMessage.isEmpty() ? i18n("Unknown error") : errorMessage);
     }
 
-    const bool wasRollback = m_txnIsRollback;
+    const TxnKind kind = m_txnKind;
     cleanupTransaction();
     setBusy(false);
+    setResetting(false);
 
-    if (wasRollback) {
+    switch (kind) {
+    case TxnKind::Rollback:
         Q_EMIT rollbackFinished(success);
-    } else {
+        break;
+    case TxnKind::Reset:
+        if (success) {
+            fetchDeployments();
+            rebootSystem();
+        }
+        break;
+    case TxnKind::Upgrade:
         if (success)
             fetchDeployments();
         Q_EMIT upgradeFinished(success);
+        break;
     }
 }
 
@@ -437,4 +507,18 @@ void SoftwareUpdateBackend::setChecking(bool v)
     if (m_checking == v) return;
     m_checking = v;
     Q_EMIT checkingChanged();
+}
+
+void SoftwareUpdateBackend::setResetting(bool v)
+{
+    if (m_resetting == v) return;
+    m_resetting = v;
+    Q_EMIT resettingChanged();
+}
+
+void SoftwareUpdateBackend::setLayeredPackages(const QStringList &v)
+{
+    if (m_layeredPackages == v) return;
+    m_layeredPackages = v;
+    Q_EMIT layeredPackagesChanged();
 }

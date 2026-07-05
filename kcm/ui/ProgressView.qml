@@ -65,7 +65,9 @@ ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 2
                     QQC2.Label {
-                        text: i18n("%1 %2 is being downloaded", backend.osName, backend.pendingVersion)
+                        text: backend.resetting
+                            ? i18n("Layered packages are being removed")
+                            : i18n("%1 %2 is being downloaded", backend.osName, backend.pendingVersion)
                         font.bold: true
                         font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.05)
                         wrapMode: Text.WordWrap

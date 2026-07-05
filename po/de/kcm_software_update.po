@@ -92,8 +92,8 @@ msgstr "Das System startet dann mit %1 %2 neu."
 msgid "After the restart the system will run version %1."
 msgstr "Nach dem Neustart läuft das System mit Version %1."
 
-msgid "%1 — Restart required"
-msgstr "%1 — Neustart erforderlich"
+msgid "%1 %2 — Restart required"
+msgstr "%1 %2 — Neustart erforderlich"
 
 msgid "Current"
 msgstr "Aktuell"
@@ -112,3 +112,34 @@ msgstr "Aus"
 
 msgid "Your files and settings stay unchanged. You can always update to the latest version again afterwards."
 msgstr "Deine Dateien und Einstellungen bleiben unverändert. Du kannst danach jederzeit wieder auf die neueste Version aktualisieren."
+
+msgid "Checking…"
+msgstr "Wird geprüft…"
+
+msgid "System updates are paused"
+msgstr "Systemaktualisierungen pausiert"
+
+msgid "Packages layered with rpm-ostree prevent updates: %1"
+msgstr "Mit rpm-ostree installierte Zusatzpakete verhindern Aktualisierungen: %1"
+
+msgid "Remove packages…"
+msgstr "Pakete entfernen…"
+
+msgid "Remove layered packages?"
+msgstr "Zusätzliche Pakete entfernen?"
+
+msgid ""
+"The following packages will be removed and the system will restart "
+"afterwards:\n"
+"\n"
+"%1"
+msgstr ""
+"Die folgenden Pakete werden entfernt, danach startet das System neu:\n"
+"\n"
+"%1"
+
+msgid "Remove packages and restart"
+msgstr "Pakete entfernen und neu starten"
+
+msgid "Layered packages are being removed"
+msgstr "Zusätzliche Pakete werden entfernt"

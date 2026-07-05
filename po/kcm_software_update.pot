@@ -79,3 +79,31 @@ msgstr ""
 
 msgid "Rollback ready"
 msgstr ""
+
+msgid "Checking…"
+msgstr ""
+
+msgid "System updates are paused"
+msgstr ""
+
+msgid "Packages layered with rpm-ostree prevent updates: %1"
+msgstr ""
+
+msgid "Remove packages…"
+msgstr ""
+
+msgid "Remove layered packages?"
+msgstr ""
+
+msgid ""
+"The following packages will be removed and the system will restart "
+"afterwards:\n"
+"\n"
+"%1"
+msgstr ""
+
+msgid "Remove packages and restart"
+msgstr ""
+
+msgid "Layered packages are being removed"
+msgstr ""

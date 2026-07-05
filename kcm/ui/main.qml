@@ -36,48 +36,134 @@ KCMUtils.SimpleKCM {
         }
     }
 
-    // Drives view transitions via state machine so we never push/pop on SimpleKCM
-    Item {
-        id: mainLoader
+    Kirigami.PromptDialog {
+        id: resetDialog
+        title: i18n("Remove layered packages?")
+        subtitle: i18n("The following packages will be removed and the system will restart afterwards:\n\n%1",
+                       root.backend ? root.backend.layeredPackages.join("\n") : "")
+        standardButtons: Kirigami.Dialog.Cancel
+        customFooterActions: [
+            Kirigami.Action {
+                text: i18n("Remove packages and restart")
+                icon.name: "edit-delete"
+                onTriggered: {
+                    resetDialog.close()
+                    root.backend.startReset()
+                }
+            }
+        ]
+    }
+
+    ColumnLayout {
         anchors {
             fill: parent
             margins: 20
         }
-        state: "auto"
+        spacing: Kirigami.Units.largeSpacing
 
-        states: [
-            State { name: "auto" },
-            State { name: "done" },
-            State { name: "rollbackDone" },
-            State { name: "error" },
-            State { name: "rollbackConfirm" },
-            State { name: "scheduled" }
-        ]
+        Rectangle {
+            Layout.fillWidth: true
+            visible: root.backend && root.backend.layeredPackages.length > 0
+                     && (mainLoader.effectiveView === "upToDate"
+                         || mainLoader.effectiveView === "updateAvailable")
+            color: Qt.rgba(Kirigami.Theme.negativeTextColor.r,
+                           Kirigami.Theme.negativeTextColor.g,
+                           Kirigami.Theme.negativeTextColor.b, 0.08)
+            border.color: Qt.rgba(Kirigami.Theme.negativeTextColor.r,
+                                  Kirigami.Theme.negativeTextColor.g,
+                                  Kirigami.Theme.negativeTextColor.b, 0.25)
+            border.width: 1
+            radius: Kirigami.Units.largeSpacing
+            implicitHeight: layeredRow.implicitHeight + Kirigami.Units.gridUnit * 2
 
-        // Compute effective state from backend + explicit overrides
-        property string effectiveView: {
-            if (state === "done") return "done"
-            if (state === "rollbackDone") return "rollbackDone"
-            if (state === "error") return "error"
-            if (state === "rollbackConfirm") return "rollbackConfirm"
-            if (state === "scheduled") return "scheduled"
-            if (root.backend && root.backend.busy) return "progress"
-            if (root.backend && root.backend.updateAvailable) return "updateAvailable"
-            return "upToDate"
+            RowLayout {
+                id: layeredRow
+                anchors {
+                    left: parent.left; right: parent.right; top: parent.top
+                    margins: Kirigami.Units.gridUnit
+                }
+                spacing: Kirigami.Units.largeSpacing
+
+                Rectangle {
+                    width: 56; height: 56; radius: 28
+                    color: Qt.rgba(Kirigami.Theme.negativeTextColor.r,
+                                   Kirigami.Theme.negativeTextColor.g,
+                                   Kirigami.Theme.negativeTextColor.b, 0.18)
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        source: "qrc:/kcm/kcm_software_update/icons/alert-circle.svg"
+                        isMask: true
+                        width: 32; height: 32
+                        color: Kirigami.Theme.negativeTextColor
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    QQC2.Label {
+                        text: i18n("System updates are paused")
+                        font.bold: true
+                        font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.05)
+                    }
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: i18n("Packages layered with rpm-ostree prevent updates: %1",
+                                   root.backend ? root.backend.layeredPackages.join(", ") : "")
+                        opacity: 0.7
+                        wrapMode: Text.WordWrap
+                    }
+                }
+
+                QQC2.Button {
+                    text: i18n("Remove packages…")
+                    icon.name: "edit-delete"
+                    onClicked: resetDialog.open()
+                }
+            }
         }
 
-        Loader {
-            anchors.fill: parent
-            sourceComponent: {
-                switch (mainLoader.effectiveView) {
-                case "progress":        return progressComp
-                case "done":            return doneComp
-                case "rollbackDone":    return rollbackDoneComp
-                case "error":           return errorComp
-                case "rollbackConfirm": return rollbackConfirmComp
-                case "scheduled":       return scheduledComp
-                case "updateAvailable": return updateAvailableComp
-                default:                return upToDateComp
+        // Drives view transitions via state machine so we never push/pop on SimpleKCM
+        Item {
+            id: mainLoader
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            state: "auto"
+
+            states: [
+                State { name: "auto" },
+                State { name: "done" },
+                State { name: "rollbackDone" },
+                State { name: "error" },
+                State { name: "rollbackConfirm" },
+                State { name: "scheduled" }
+            ]
+
+            // Compute effective state from backend + explicit overrides
+            property string effectiveView: {
+                if (state === "done") return "done"
+                if (state === "rollbackDone") return "rollbackDone"
+                if (state === "error") return "error"
+                if (state === "rollbackConfirm") return "rollbackConfirm"
+                if (state === "scheduled") return "scheduled"
+                if (root.backend && root.backend.busy) return "progress"
+                if (root.backend && root.backend.updateAvailable) return "updateAvailable"
+                return "upToDate"
+            }
+
+            Loader {
+                anchors.fill: parent
+                sourceComponent: {
+                    switch (mainLoader.effectiveView) {
+                    case "progress":        return progressComp
+                    case "done":            return doneComp
+                    case "rollbackDone":    return rollbackDoneComp
+                    case "error":           return errorComp
+                    case "rollbackConfirm": return rollbackConfirmComp
+                    case "scheduled":       return scheduledComp
+                    case "updateAvailable": return updateAvailableComp
+                    default:                return upToDateComp
+                    }
                 }
             }
         }
