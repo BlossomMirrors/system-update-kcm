@@ -56,6 +56,9 @@ qt_add_resources(kcm_software_update "qml_kcm_path"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/InfoRow.qml"
 )
 
+target_compile_definitions(kcm_software_update
+    PRIVATE TRANSLATION_DOMAIN="kcm_software_update")
+
 target_link_libraries(kcm_software_update
     PRIVATE
         Qt6::Core

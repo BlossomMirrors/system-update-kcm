@@ -24,6 +24,10 @@ static constexpr auto TIMER_UNIT         = "rpm-ostreed-automatic.timer";
 static constexpr auto TIMER_PATH         =
     "/org/freedesktop/systemd1/unit/rpm_2dostreed_2dautomatic_2etimer";
 static constexpr auto TXN_CONN_NAME      = "kcm-rpmostree-txn";
+static constexpr auto JOBVIEW_SERVICE      = "org.kde.JobViewServer";
+static constexpr auto JOBVIEW_SERVER_PATH  = "/JobViewServer";
+static constexpr auto JOBVIEW_SERVER_IFACE = "org.kde.JobViewServer";
+static constexpr auto JOBVIEW_IFACE        = "org.kde.JobViewV2";
 
 static QString readOsName()
 {
@@ -50,6 +54,7 @@ SoftwareUpdateBackend::SoftwareUpdateBackend(QObject *parent)
 
 SoftwareUpdateBackend::~SoftwareUpdateBackend()
 {
+    closeJobView(QString());
     cleanupTransaction();
 }
 
@@ -164,6 +169,7 @@ void SoftwareUpdateBackend::cancelUpgrade()
 {
     if (m_txnIface)
         m_txnIface->cancel();
+    closeJobView(QString());
     cleanupTransaction();
     setBusy(false);
     setResetting(false);
@@ -398,6 +404,74 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
             this, &SoftwareUpdateBackend::onTxnFinished);
 
     m_txnIface->start();
+    openJobView(kind);
+}
+
+void SoftwareUpdateBackend::openJobView(TxnKind kind)
+{
+    closeJobView(QString());
+
+    QString title;
+    switch (kind) {
+    case TxnKind::Rollback: title = i18n("Rolling back %1", m_osName); break;
+    case TxnKind::Reset:    title = i18n("Removing layered packages"); break;
+    case TxnKind::Upgrade:  title = i18n("Updating %1", m_osName); break;
+    }
+
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QLatin1String(JOBVIEW_SERVICE), QLatin1String(JOBVIEW_SERVER_PATH),
+        QLatin1String(JOBVIEW_SERVER_IFACE), QStringLiteral("requestView"));
+    // app name, icon name, capabilities (1 = killable)
+    msg.setArguments({i18n("Software Update"),
+                      QStringLiteral("system-software-update"), 1});
+
+    auto *w = new QDBusPendingCallWatcher(
+        QDBusConnection::sessionBus().asyncCall(msg), this);
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this, title](QDBusPendingCallWatcher *watcher) {
+        watcher->deleteLater();
+        QDBusPendingReply<QDBusObjectPath> reply = *watcher;
+        if (reply.isError())
+            return;
+        const QString path = reply.value().path();
+        if (!m_busy) {
+            QDBusMessage t = QDBusMessage::createMethodCall(
+                QLatin1String(JOBVIEW_SERVICE), path,
+                QLatin1String(JOBVIEW_IFACE), QStringLiteral("terminate"));
+            t.setArguments({QString()});
+            QDBusConnection::sessionBus().asyncCall(t);
+            return;
+        }
+        m_jobViewPath = path;
+        jobViewCall(QStringLiteral("setInfoMessage"), {title});
+        if (m_progressPercent > 0)
+            jobViewCall(QStringLiteral("setPercent"),
+                        {QVariant::fromValue(static_cast<quint32>(m_progressPercent))});
+        QDBusConnection::sessionBus().connect(
+            QString(), m_jobViewPath, QLatin1String(JOBVIEW_IFACE),
+            QStringLiteral("cancelRequested"), this, SLOT(cancelUpgrade()));
+    });
+}
+
+void SoftwareUpdateBackend::closeJobView(const QString &errorMessage)
+{
+    if (m_jobViewPath.isEmpty())
+        return;
+    QDBusConnection::sessionBus().disconnect(
+        QString(), m_jobViewPath, QLatin1String(JOBVIEW_IFACE),
+        QStringLiteral("cancelRequested"), this, SLOT(cancelUpgrade()));
+    jobViewCall(QStringLiteral("terminate"), {errorMessage});
+    m_jobViewPath.clear();
+}
+
+void SoftwareUpdateBackend::jobViewCall(const QString &method, const QVariantList &args)
+{
+    if (m_jobViewPath.isEmpty())
+        return;
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QLatin1String(JOBVIEW_SERVICE), m_jobViewPath,
+        QLatin1String(JOBVIEW_IFACE), method);
+    msg.setArguments(args);
+    QDBusConnection::sessionBus().asyncCall(msg);
 }
 
 void SoftwareUpdateBackend::cleanupTransaction()
@@ -414,6 +488,8 @@ void SoftwareUpdateBackend::cleanupTransaction()
 void SoftwareUpdateBackend::onTxnMessage(const QString &msg)
 {
     setProgressMessage(msg);
+    jobViewCall(QStringLiteral("setDescriptionField"),
+                {QVariant::fromValue(0u), QString(), msg});
 }
 
 void SoftwareUpdateBackend::onTxnProgress(const QString &text, quint32 percent)
@@ -421,13 +497,17 @@ void SoftwareUpdateBackend::onTxnProgress(const QString &text, quint32 percent)
     if (!text.isEmpty())
         setProgressMessage(text);
     setProgressPercent(static_cast<int>(percent));
+    jobViewCall(QStringLiteral("setPercent"), {QVariant::fromValue(percent)});
 }
 
 void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMessage)
 {
+    const QString effectiveError =
+        errorMessage.isEmpty() ? i18n("Unknown error") : errorMessage;
     if (!success) {
-        Q_EMIT errorOccurred(errorMessage.isEmpty() ? i18n("Unknown error") : errorMessage);
+        Q_EMIT errorOccurred(effectiveError);
     }
+    closeJobView(success ? QString() : effectiveError);
 
     const TxnKind kind = m_txnKind;
     cleanupTransaction();

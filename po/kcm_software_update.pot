@@ -113,3 +113,18 @@ msgstr ""
 
 msgid "The update could not be completed."
 msgstr ""
+
+msgid "Updating %1"
+msgstr ""
+
+msgid "Rolling back %1"
+msgstr ""
+
+msgid "Unknown error"
+msgstr ""
+
+msgid "Failed to connect to rpm-ostree transaction"
+msgstr ""
+
+msgid "Removing layered packages"
+msgstr ""

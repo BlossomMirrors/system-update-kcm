@@ -149,3 +149,18 @@ msgstr "Erneut versuchen"
 
 msgid "The update could not be completed."
 msgstr "Die Aktualisierung konnte nicht abgeschlossen werden."
+
+msgid "Updating %1"
+msgstr "%1 wird aktualisiert"
+
+msgid "Rolling back %1"
+msgstr "%1 wird zurückgesetzt"
+
+msgid "Removing layered packages"
+msgstr "Zusätzliche Pakete werden entfernt"
+
+msgid "Unknown error"
+msgstr "Unbekannter Fehler"
+
+msgid "Failed to connect to rpm-ostree transaction"
+msgstr "Verbindung zur rpm-ostree-Transaktion fehlgeschlagen"

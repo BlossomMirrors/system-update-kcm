@@ -65,12 +65,14 @@ public:
 
     Q_INVOKABLE void startUpgrade();
     Q_INVOKABLE void scheduleUpgrade();
-    Q_INVOKABLE void cancelUpgrade();
     Q_INVOKABLE void startRollback();
     Q_INVOKABLE void setAutoUpdate(bool enabled);
     Q_INVOKABLE void checkForUpdates();
     Q_INVOKABLE void rebootSystem();
     Q_INVOKABLE void startReset();
+
+public Q_SLOTS:
+    void cancelUpgrade();
 
 Q_SIGNALS:
     void upgradeFinished(bool success);
@@ -114,6 +116,9 @@ private:
     void readAutoUpdateState();
     void beginTransaction(const QString &address, TxnKind kind);
     void cleanupTransaction();
+    void openJobView(TxnKind kind);
+    void closeJobView(const QString &errorMessage);
+    void jobViewCall(const QString &method, const QVariantList &args);
 
     QString m_osName;
     QString m_currentVersion;
@@ -130,5 +135,6 @@ private:
     TxnKind m_txnKind           = TxnKind::Upgrade;
 
     QString              m_txnConnectionName;
+    QString              m_jobViewPath;
     RpmOstreeTransaction *m_txnIface = nullptr;
 };
