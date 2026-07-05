@@ -240,8 +240,14 @@ void SoftwareUpdateBackend::rebootSystem()
                  QStringLiteral("Reboot"), {QVariant(true)}), this);
     connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
         watcher->deleteLater();
-        if (watcher->isError())
-            Q_EMIT errorOccurred(watcher->error().message());
+        if (!watcher->isError())
+            return;
+        // Connection loss just means the shutdown is already underway
+        const QDBusError::ErrorType type = watcher->error().type();
+        if (type == QDBusError::Disconnected || type == QDBusError::NoReply
+            || type == QDBusError::TimedOut)
+            return;
+        Q_EMIT errorOccurred(watcher->error().message());
     });
 }
 
@@ -433,10 +439,8 @@ void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMess
         Q_EMIT rollbackFinished(success);
         break;
     case TxnKind::Reset:
-        if (success) {
-            fetchDeployments();
+        if (success)
             rebootSystem();
-        }
         break;
     case TxnKind::Upgrade:
         if (success)
