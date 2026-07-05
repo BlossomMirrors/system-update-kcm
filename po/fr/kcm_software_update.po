@@ -1,0 +1,130 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026 Blossom
+# This file is distributed under the same license as the kcm_software_update package.
+# koyu <me@koyu.space>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: kcm_software_update 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-05-18 00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+
+msgid "Software Update"
+msgstr ""
+
+msgid "Update available"
+msgstr ""
+
+msgid "Update tonight"
+msgstr ""
+
+msgid "Update now"
+msgstr ""
+
+msgid "Check for updates"
+msgstr ""
+
+msgid "Your system is up to date."
+msgstr ""
+
+msgid "Automatic updates"
+msgstr ""
+
+msgid "Previous version"
+msgstr ""
+
+msgid "Roll back"
+msgstr ""
+
+msgid "Roll back and restart"
+msgstr ""
+
+msgid "Restart now"
+msgstr ""
+
+msgid "Restart later"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Update ready"
+msgstr ""
+
+msgid "Downloading update…"
+msgstr ""
+
+msgid "Roll back to previous version?"
+msgstr ""
+
+msgid "Updates are applied atomically and can always be rolled back. Your files and settings are never affected."
+msgstr ""
+
+msgid "An error occurred"
+msgstr ""
+
+msgid "Transaction log"
+msgstr ""
+
+msgid "Update scheduled"
+msgstr ""
+
+msgid "Rollback ready"
+msgstr ""
+
+msgid "Checking…"
+msgstr ""
+
+msgid "System updates are paused"
+msgstr ""
+
+msgid "Packages layered with rpm-ostree prevent updates: %1"
+msgstr ""
+
+msgid "Remove packages…"
+msgstr ""
+
+msgid "Remove layered packages?"
+msgstr ""
+
+msgid ""
+"The following packages will be removed and the system will restart "
+"afterwards:\n"
+"\n"
+"%1"
+msgstr ""
+
+msgid "Remove packages and restart"
+msgstr ""
+
+msgid "Layered packages are being removed"
+msgstr ""
+
+msgid "Try again"
+msgstr ""
+
+msgid "The update could not be completed."
+msgstr ""
+
+msgid "Updating %1"
+msgstr ""
+
+msgid "Rolling back %1"
+msgstr ""
+
+msgid "Unknown error"
+msgstr ""
+
+msgid "Failed to connect to rpm-ostree transaction"
+msgstr ""
+
+msgid "Removing layered packages"
+msgstr ""
