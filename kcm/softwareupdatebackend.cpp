@@ -58,13 +58,6 @@ SoftwareUpdateBackend::~SoftwareUpdateBackend()
     cleanupTransaction();
 }
 
-void SoftwareUpdateBackend::checkForUpdates()
-{
-    setChecking(true);
-    fetchDeployments();
-    readAutoUpdateState();
-}
-
 // Build a system-bus method call with interactive Polkit authorization enabled.
 static QDBusPendingCall authCall(const char *service, const char *path,
                                  const char *iface, const QString &method,
@@ -75,6 +68,30 @@ static QDBusPendingCall authCall(const char *service, const char *path,
     msg.setArguments(args);
     msg.setInteractiveAuthorizationAllowed(true);
     return QDBusConnection::systemBus().asyncCall(msg);
+}
+
+void SoftwareUpdateBackend::checkForUpdates()
+{
+    if (m_busy || m_checking) return;
+    setChecking(true);
+    readAutoUpdateState();
+
+    const QVariantMap options{{QStringLiteral("mode"), QStringLiteral("check")}};
+    auto *w = new QDBusPendingCallWatcher(
+        authCall(RPMOSTREE_SERVICE, RPMOSTREE_OS_PATH, RPMOSTREE_OS_IFACE,
+                 QStringLiteral("AutomaticUpdateTrigger"),
+                 {QVariant::fromValue(options)}), this);
+
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
+        watcher->deleteLater();
+        QDBusPendingReply<bool, QString> reply = *watcher;
+        if (reply.isError()) {
+            // Fall back to showing the local state only
+            fetchDeployments();
+            return;
+        }
+        beginTransaction(reply.argumentAt<1>(), TxnKind::Check);
+    });
 }
 
 void SoftwareUpdateBackend::startUpgrade()
@@ -335,6 +352,7 @@ void SoftwareUpdateBackend::fetchDeployments()
             if (booted && current.isEmpty()) {
                 current = version;
                 bootedDigest = imageDigest(dep);
+                m_bootedChecksum = dep.value(QStringLiteral("checksum")).toString();
                 layeredBooted = layeredOf(dep);
             } else if (staged && pending.isEmpty()) {
                 pending = version;
@@ -351,6 +369,56 @@ void SoftwareUpdateBackend::fetchDeployments()
         // The staged deployment reflects what the next boot and future updates use
         setLayeredPackages(hasStaged ? layeredStaged : layeredBooted);
         setUpdateAvailable(!pending.isEmpty() && pendingDigest != bootedDigest);
+        fetchCachedUpdate();
+    });
+}
+
+void SoftwareUpdateBackend::fetchCachedUpdate()
+{
+    auto *iface = new QDBusInterface(
+        QLatin1String(RPMOSTREE_SERVICE), QLatin1String(RPMOSTREE_OS_PATH),
+        QStringLiteral("org.freedesktop.DBus.Properties"),
+        QDBusConnection::systemBus(), this);
+
+    auto *w = new QDBusPendingCallWatcher(
+        iface->asyncCall(QStringLiteral("Get"),
+                         QLatin1String(RPMOSTREE_OS_IFACE),
+                         QStringLiteral("CachedUpdate")), this);
+
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this, iface](QDBusPendingCallWatcher *watcher) {
+        iface->deleteLater();
+        watcher->deleteLater();
+        QDBusPendingReply<QDBusVariant> reply = *watcher;
+        if (!reply.isError()) {
+            QVariantMap update;
+            const QVariant v = reply.value().variant();
+            if (v.canConvert<QDBusArgument>())
+                qvariant_cast<QDBusArgument>(v) >> update;
+
+            // Container images keep the same version label across builds,
+            // so a new commit only shows up as a checksum or layer change
+            const QString checksum = update.value(QStringLiteral("checksum")).toString();
+            quint64 changedLayers = 0;
+            const QVariant diffVar = update.value(QStringLiteral("manifest-diff"));
+            if (diffVar.canConvert<QDBusArgument>()) {
+                QVariantMap diff;
+                qvariant_cast<QDBusArgument>(diffVar) >> diff;
+                changedLayers = diff.value(QStringLiteral("n-added")).toULongLong()
+                              + diff.value(QStringLiteral("n-removed")).toULongLong();
+            }
+
+            const bool available = !update.isEmpty()
+                && (update.value(QStringLiteral("ref-has-new-commit")).toBool()
+                    || changedLayers > 0
+                    || (!checksum.isEmpty() && !m_bootedChecksum.isEmpty()
+                        && checksum != m_bootedChecksum));
+            if (available) {
+                const QString version = update.value(QStringLiteral("version")).toString();
+                if (m_pendingVersion.isEmpty() && !version.isEmpty())
+                    setPendingVersion(version);
+                setUpdateAvailable(true);
+            }
+        }
         setChecking(false);
     });
 }
@@ -389,6 +457,7 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
         Q_EMIT errorOccurred(i18n("Failed to connect to rpm-ostree transaction"));
         setBusy(false);
         setResetting(false);
+        setChecking(false);
         if (kind == TxnKind::Rollback)     Q_EMIT rollbackFinished(false);
         else if (kind == TxnKind::Upgrade) Q_EMIT upgradeFinished(false);
         return;
@@ -404,7 +473,8 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
             this, &SoftwareUpdateBackend::onTxnFinished);
 
     m_txnIface->start();
-    openJobView(kind);
+    if (kind != TxnKind::Check)
+        openJobView(kind);
 }
 
 void SoftwareUpdateBackend::openJobView(TxnKind kind)
@@ -416,6 +486,7 @@ void SoftwareUpdateBackend::openJobView(TxnKind kind)
     case TxnKind::Rollback: title = i18n("Rolling back %1", m_osName); break;
     case TxnKind::Reset:    title = i18n("Removing layered packages"); break;
     case TxnKind::Upgrade:  title = i18n("Updating %1", m_osName); break;
+    case TxnKind::Check:    return;
     }
 
     QDBusMessage msg = QDBusMessage::createMethodCall(
@@ -502,14 +573,14 @@ void SoftwareUpdateBackend::onTxnProgress(const QString &text, quint32 percent)
 
 void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMessage)
 {
+    const TxnKind kind = m_txnKind;
     const QString effectiveError =
         errorMessage.isEmpty() ? i18n("Unknown error") : errorMessage;
-    if (!success) {
+    // A failed check falls back to local state instead of the error view
+    if (!success && kind != TxnKind::Check) {
         Q_EMIT errorOccurred(effectiveError);
     }
     closeJobView(success ? QString() : effectiveError);
-
-    const TxnKind kind = m_txnKind;
     cleanupTransaction();
     setBusy(false);
     setResetting(false);
@@ -521,6 +592,12 @@ void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMess
     case TxnKind::Reset:
         if (success)
             rebootSystem();
+        break;
+    case TxnKind::Check:
+        if (success)
+            fetchDeployments();
+        else
+            setChecking(false);
         break;
     case TxnKind::Upgrade:
         if (success)

@@ -17,7 +17,6 @@ qt_add_qml_module(kcm_software_update
         ui/UpToDateView.qml
         ui/ProgressView.qml
         ui/DoneView.qml
-        ui/RollbackConfirm.qml
         ui/RollbackDone.qml
         ui/ScheduledView.qml
         ui/ErrorView.qml
@@ -49,7 +48,6 @@ qt_add_resources(kcm_software_update "qml_kcm_path"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/UpToDateView.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/ProgressView.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/DoneView.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/RollbackConfirm.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/RollbackDone.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/ScheduledView.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/ErrorView.qml"

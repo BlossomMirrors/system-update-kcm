@@ -128,3 +128,9 @@ msgstr ""
 
 msgid "Removing layered packages"
 msgstr ""
+
+msgid "This update contains security updates, bug fixes and updated packages for %1. After downloading, the update will be applied on the next restart."
+msgstr ""
+
+msgid "Version %1"
+msgstr ""

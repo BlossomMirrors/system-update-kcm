@@ -98,7 +98,7 @@ private Q_SLOTS:
     void onTxnFinished(bool success, const QString &errorMessage);
 
 private:
-    enum class TxnKind { Upgrade, Rollback, Reset };
+    enum class TxnKind { Upgrade, Rollback, Reset, Check };
 
     void setCurrentVersion(const QString &v);
     void setPendingVersion(const QString &v);
@@ -113,6 +113,7 @@ private:
     void setLayeredPackages(const QStringList &v);
 
     void fetchDeployments();
+    void fetchCachedUpdate();
     void readAutoUpdateState();
     void beginTransaction(const QString &address, TxnKind kind);
     void cleanupTransaction();
@@ -134,6 +135,7 @@ private:
     QStringList m_layeredPackages;
     TxnKind m_txnKind           = TxnKind::Upgrade;
 
+    QString              m_bootedChecksum;
     QString              m_txnConnectionName;
     QString              m_jobViewPath;
     RpmOstreeTransaction *m_txnIface = nullptr;

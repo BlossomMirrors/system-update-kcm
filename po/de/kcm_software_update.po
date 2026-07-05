@@ -164,3 +164,9 @@ msgstr "Unbekannter Fehler"
 
 msgid "Failed to connect to rpm-ostree transaction"
 msgstr "Verbindung zur rpm-ostree-Transaktion fehlgeschlagen"
+
+msgid "This update contains security updates, bug fixes and updated packages for %1. After downloading, the update will be applied on the next restart."
+msgstr "Diese Aktualisierung enthält Sicherheitsaktualisierungen, Fehlerbehebungen und aktualisierte Pakete für %1. Nach dem Herunterladen wird die Aktualisierung beim nächsten Neustart angewendet."
+
+msgid "Version %1"
+msgstr "Version %1"

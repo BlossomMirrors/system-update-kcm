@@ -54,6 +54,27 @@ KCMUtils.SimpleKCM {
         ]
     }
 
+    Kirigami.PromptDialog {
+        id: rollbackDialog
+        title: i18n("Roll back to previous version?")
+        subtitle: root.backend
+            ? i18n("The system will then restart with %1 %2.",
+                   root.backend.osName, root.backend.previousVersion) + "\n\n"
+              + i18n("Your files and settings stay unchanged. You can always update to the latest version again afterwards.")
+            : ""
+        standardButtons: Kirigami.Dialog.Cancel
+        customFooterActions: [
+            Kirigami.Action {
+                text: i18n("Roll back and restart")
+                icon.name: "edit-undo"
+                onTriggered: {
+                    rollbackDialog.close()
+                    root.backend.startRollback()
+                }
+            }
+        ]
+    }
+
     ColumnLayout {
         anchors {
             fill: parent
@@ -135,7 +156,6 @@ KCMUtils.SimpleKCM {
                 State { name: "done" },
                 State { name: "rollbackDone" },
                 State { name: "error" },
-                State { name: "rollbackConfirm" },
                 State { name: "scheduled" }
             ]
 
@@ -144,7 +164,6 @@ KCMUtils.SimpleKCM {
                 if (state === "done") return "done"
                 if (state === "rollbackDone") return "rollbackDone"
                 if (state === "error") return "error"
-                if (state === "rollbackConfirm") return "rollbackConfirm"
                 if (state === "scheduled") return "scheduled"
                 if (root.backend && root.backend.busy) return "progress"
                 if (root.backend && root.backend.updateAvailable) return "updateAvailable"
@@ -159,7 +178,6 @@ KCMUtils.SimpleKCM {
                     case "done":            return doneComp
                     case "rollbackDone":    return rollbackDoneComp
                     case "error":           return errorComp
-                    case "rollbackConfirm": return rollbackConfirmComp
                     case "scheduled":       return scheduledComp
                     case "updateAvailable": return updateAvailableComp
                     default:                return upToDateComp
@@ -173,7 +191,7 @@ KCMUtils.SimpleKCM {
         id: updateAvailableComp
         UpdateAvailable {
             backend: root.backend
-            onRequestRollbackConfirm: mainLoader.state = "rollbackConfirm"
+            onRequestRollbackConfirm: rollbackDialog.open()
             onRequestScheduled: mainLoader.state = "scheduled"
         }
     }
@@ -182,7 +200,7 @@ KCMUtils.SimpleKCM {
         id: upToDateComp
         UpToDateView {
             backend: root.backend
-            onRequestRollbackConfirm: mainLoader.state = "rollbackConfirm"
+            onRequestRollbackConfirm: rollbackDialog.open()
         }
     }
 
@@ -216,18 +234,6 @@ KCMUtils.SimpleKCM {
                 mainLoader.state = "auto"
                 root.backend.startUpgrade()
             }
-        }
-    }
-
-    Component {
-        id: rollbackConfirmComp
-        RollbackConfirm {
-            backend: root.backend
-            onAccepted: {
-                mainLoader.state = "auto"
-                root.backend.startRollback()
-            }
-            onRejected: mainLoader.state = "auto"
         }
     }
 

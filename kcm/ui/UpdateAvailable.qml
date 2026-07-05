@@ -49,7 +49,6 @@ ColumnLayout {
                 }
 
                 ColumnLayout {
-                    Layout.fillWidth: true
                     spacing: 2
                     QQC2.Label {
                         text: backend.osName
@@ -62,20 +61,12 @@ ColumnLayout {
                     }
                 }
 
-                RowLayout {
-                    spacing: Kirigami.Units.smallSpacing
-                    QQC2.Button {
-                        text: i18n("Update tonight")
-                        onClicked: {
-                            backend.scheduleUpgrade()
-                            root.requestScheduled()
-                        }
-                    }
-                    QQC2.Button {
-                        text: i18n("Update now")
-                        highlighted: true
-                        onClicked: backend.startUpgrade()
-                    }
+                Item { Layout.fillWidth: true }
+
+                QQC2.Button {
+                    text: i18n("Update now")
+                    highlighted: true
+                    onClicked: backend.startUpgrade()
                 }
             }
 
