@@ -8,7 +8,9 @@
 #include <QDBusPendingReply>
 #include <QDBusVariant>
 #include <QFile>
+#include <QLocale>
 #include <QTextStream>
+#include <QTimer>
 
 #include <KLocalizedString>
 
@@ -99,6 +101,7 @@ void SoftwareUpdateBackend::startUpgrade()
     if (m_busy) return;
     setBusy(true);
     setProgressPercent(0);
+    setHasPercent(false);
     setProgressMessage(QString());
 
     auto *w = new QDBusPendingCallWatcher(
@@ -123,6 +126,7 @@ void SoftwareUpdateBackend::startRollback()
     if (m_busy) return;
     setBusy(true);
     setProgressPercent(0);
+    setHasPercent(false);
     setProgressMessage(QString());
 
     auto *w = new QDBusPendingCallWatcher(
@@ -148,6 +152,7 @@ void SoftwareUpdateBackend::startReset()
     setBusy(true);
     setResetting(true);
     setProgressPercent(0);
+    setHasPercent(false);
     setProgressMessage(QString());
 
     // Same options the rpm-ostree reset CLI passes to UpdateDeployment
@@ -399,12 +404,14 @@ void SoftwareUpdateBackend::fetchCachedUpdate()
             // so a new commit only shows up as a checksum or layer change
             const QString checksum = update.value(QStringLiteral("checksum")).toString();
             quint64 changedLayers = 0;
+            quint64 addedSize = 0;
             const QVariant diffVar = update.value(QStringLiteral("manifest-diff"));
             if (diffVar.canConvert<QDBusArgument>()) {
                 QVariantMap diff;
                 qvariant_cast<QDBusArgument>(diffVar) >> diff;
                 changedLayers = diff.value(QStringLiteral("n-added")).toULongLong()
                               + diff.value(QStringLiteral("n-removed")).toULongLong();
+                addedSize = diff.value(QStringLiteral("added-size")).toULongLong();
             }
 
             const bool available = !update.isEmpty()
@@ -418,6 +425,10 @@ void SoftwareUpdateBackend::fetchCachedUpdate()
                     setPendingVersion(version);
                 setUpdateAvailable(true);
             }
+            m_downloadBytes = available ? addedSize : 0;
+            setDownloadSize(available && addedSize > 0
+                ? QLocale().formattedDataSize(static_cast<qint64>(addedSize))
+                : QString());
         }
         setChecking(false);
     });
@@ -467,6 +478,9 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
     m_txnIface = new RpmOstreeTransaction(conn, this);
     connect(m_txnIface, &RpmOstreeTransaction::Message,
             this, &SoftwareUpdateBackend::onTxnMessage);
+    // Container layer downloads only report activity via task texts
+    connect(m_txnIface, &RpmOstreeTransaction::TaskBegin,
+            this, &SoftwareUpdateBackend::onTxnMessage);
     connect(m_txnIface, &RpmOstreeTransaction::PercentProgress,
             this, &SoftwareUpdateBackend::onTxnProgress);
     connect(m_txnIface, &RpmOstreeTransaction::Finished,
@@ -475,6 +489,75 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
     m_txnIface->start();
     if (kind != TxnKind::Check)
         openJobView(kind);
+    if (kind == TxnKind::Upgrade)
+        startDiskProgress();
+}
+
+// Total received bytes over all physical network interfaces
+static quint64 totalRxBytes()
+{
+    QFile f(QStringLiteral("/proc/net/dev"));
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        return 0;
+    QTextStream in(&f);
+    in.readLine();
+    in.readLine();
+    quint64 total = 0;
+    while (!in.atEnd()) {
+        const QString line = in.readLine().trimmed();
+        const int colon = line.indexOf(QLatin1Char(':'));
+        if (colon <= 0)
+            continue;
+        if (line.left(colon).trimmed() == QLatin1String("lo"))
+            continue;
+        const QStringList fields =
+            line.mid(colon + 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        if (!fields.isEmpty())
+            total += fields.at(0).toULongLong();
+    }
+    return total;
+}
+
+// rpm-ostree reports no byte progress while pulling container layers,
+// so the downloaded amount is estimated from network receive counters
+void SoftwareUpdateBackend::startDiskProgress()
+{
+    if (m_downloadBytes == 0)
+        return;
+    m_diskBaseline = totalRxBytes();
+    if (m_diskBaseline == 0)
+        return;
+
+    if (!m_diskTimer) {
+        m_diskTimer = new QTimer(this);
+        m_diskTimer->setInterval(1000);
+        connect(m_diskTimer, &QTimer::timeout, this, [this] {
+            const quint64 rx = totalRxBytes();
+            const quint64 used = rx > m_diskBaseline ? rx - m_diskBaseline : 0;
+            if (used == 0)
+                return;
+            const quint64 capped = qMin(used, m_downloadBytes);
+            const int pct = static_cast<int>(
+                qMin<quint64>(99, used * 100 / m_downloadBytes));
+            setHasPercent(true);
+            setDownloadedSize(QLocale().formattedDataSize(static_cast<qint64>(capped)));
+            jobViewCall(QStringLiteral("setProcessedAmount"),
+                        {QVariant::fromValue(capped), QStringLiteral("bytes")});
+            if (pct > m_progressPercent) {
+                setProgressPercent(pct);
+                jobViewCall(QStringLiteral("setPercent"),
+                            {QVariant::fromValue(static_cast<quint32>(pct))});
+            }
+        });
+    }
+    m_diskTimer->start();
+}
+
+void SoftwareUpdateBackend::stopDiskProgress()
+{
+    if (m_diskTimer)
+        m_diskTimer->stop();
+    setDownloadedSize(QString());
 }
 
 void SoftwareUpdateBackend::openJobView(TxnKind kind)
@@ -514,6 +597,9 @@ void SoftwareUpdateBackend::openJobView(TxnKind kind)
         }
         m_jobViewPath = path;
         jobViewCall(QStringLiteral("setInfoMessage"), {title});
+        if (m_downloadBytes > 0)
+            jobViewCall(QStringLiteral("setTotalAmount"),
+                        {QVariant::fromValue(m_downloadBytes), QStringLiteral("bytes")});
         if (m_progressPercent > 0)
             jobViewCall(QStringLiteral("setPercent"),
                         {QVariant::fromValue(static_cast<quint32>(m_progressPercent))});
@@ -547,6 +633,7 @@ void SoftwareUpdateBackend::jobViewCall(const QString &method, const QVariantLis
 
 void SoftwareUpdateBackend::cleanupTransaction()
 {
+    stopDiskProgress();
     delete m_txnIface;
     m_txnIface = nullptr;
 
@@ -567,6 +654,10 @@ void SoftwareUpdateBackend::onTxnProgress(const QString &text, quint32 percent)
 {
     if (!text.isEmpty())
         setProgressMessage(text);
+    // Disk based download progress wins over the jumpy per phase percents
+    if (m_diskTimer && m_diskTimer->isActive())
+        return;
+    setHasPercent(true);
     setProgressPercent(static_cast<int>(percent));
     jobViewCall(QStringLiteral("setPercent"), {QVariant::fromValue(percent)});
 }
@@ -640,6 +731,27 @@ void SoftwareUpdateBackend::setProgressMessage(const QString &v)
     if (m_progressMessage == v) return;
     m_progressMessage = v;
     Q_EMIT progressMessageChanged();
+}
+
+void SoftwareUpdateBackend::setHasPercent(bool v)
+{
+    if (m_hasPercent == v) return;
+    m_hasPercent = v;
+    Q_EMIT hasPercentChanged();
+}
+
+void SoftwareUpdateBackend::setDownloadSize(const QString &v)
+{
+    if (m_downloadSize == v) return;
+    m_downloadSize = v;
+    Q_EMIT downloadSizeChanged();
+}
+
+void SoftwareUpdateBackend::setDownloadedSize(const QString &v)
+{
+    if (m_downloadedSize == v) return;
+    m_downloadedSize = v;
+    Q_EMIT downloadedSizeChanged();
 }
 
 void SoftwareUpdateBackend::setAutoUpdateEnabled(bool v)

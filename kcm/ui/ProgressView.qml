@@ -91,7 +91,7 @@ ColumnLayout {
 
                 QQC2.ProgressBar {
                     Layout.fillWidth: true
-                    indeterminate: backend.resetting
+                    indeterminate: !backend.hasPercent
                     value: backend.progressPercent / 100.0
                     implicitHeight: 4
                 }
@@ -100,13 +100,17 @@ ColumnLayout {
                     Layout.fillWidth: true
                     visible: !backend.resetting
                     QQC2.Label {
+                        visible: backend.hasPercent
                         text: backend.progressPercent + "%"
                         opacity: 0.7
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
                     Item { Layout.fillWidth: true }
                     QQC2.Label {
-                        text: "1.2 GB"
+                        visible: backend.downloadSize !== ""
+                        text: backend.downloadedSize !== ""
+                            ? i18n("%1 of %2", backend.downloadedSize, backend.downloadSize)
+                            : backend.downloadSize
                         opacity: 0.7
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }

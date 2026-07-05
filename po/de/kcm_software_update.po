@@ -170,3 +170,9 @@ msgstr "Diese Aktualisierung enthält Sicherheitsaktualisierungen, Fehlerbehebun
 
 msgid "Version %1"
 msgstr "Version %1"
+
+msgid "Approximate download size: %1"
+msgstr "Ungefähre Downloadgröße: %1"
+
+msgid "%1 of %2"
+msgstr "%1 von %2"

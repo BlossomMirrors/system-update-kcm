@@ -25,6 +25,8 @@ public:
 
 Q_SIGNALS:
     void Message(const QString &message);
+    void TaskBegin(const QString &text);
+    void TaskEnd(const QString &text);
     void PercentProgress(const QString &text, quint32 percent);
     void Finished(bool success, const QString &errorMessage);
 };
@@ -38,7 +40,10 @@ class SoftwareUpdateBackend : public QObject
     Q_PROPERTY(QString pendingVersion  READ pendingVersion  NOTIFY pendingVersionChanged)
     Q_PROPERTY(QString previousVersion READ previousVersion NOTIFY previousVersionChanged)
     Q_PROPERTY(int     progressPercent READ progressPercent NOTIFY progressPercentChanged)
+    Q_PROPERTY(bool    hasPercent      READ hasPercent      NOTIFY hasPercentChanged)
     Q_PROPERTY(QString progressMessage READ progressMessage NOTIFY progressMessageChanged)
+    Q_PROPERTY(QString downloadSize    READ downloadSize    NOTIFY downloadSizeChanged)
+    Q_PROPERTY(QString downloadedSize  READ downloadedSize  NOTIFY downloadedSizeChanged)
     Q_PROPERTY(bool autoUpdateEnabled  READ autoUpdateEnabled NOTIFY autoUpdateEnabledChanged)
     Q_PROPERTY(bool updateAvailable    READ updateAvailable   NOTIFY updateAvailableChanged)
     Q_PROPERTY(bool busy               READ busy              NOTIFY busyChanged)
@@ -55,7 +60,10 @@ public:
     QString pendingVersion()  const { return m_pendingVersion; }
     QString previousVersion() const { return m_previousVersion; }
     int     progressPercent() const { return m_progressPercent; }
+    bool    hasPercent()      const { return m_hasPercent; }
     QString progressMessage() const { return m_progressMessage; }
+    QString downloadSize()    const { return m_downloadSize; }
+    QString downloadedSize()  const { return m_downloadedSize; }
     bool autoUpdateEnabled()  const { return m_autoUpdateEnabled; }
     bool updateAvailable()    const { return m_updateAvailable; }
     bool busy()               const { return m_busy; }
@@ -84,7 +92,10 @@ Q_SIGNALS:
     void pendingVersionChanged();
     void previousVersionChanged();
     void progressPercentChanged();
+    void hasPercentChanged();
     void progressMessageChanged();
+    void downloadSizeChanged();
+    void downloadedSizeChanged();
     void autoUpdateEnabledChanged();
     void updateAvailableChanged();
     void busyChanged();
@@ -104,7 +115,12 @@ private:
     void setPendingVersion(const QString &v);
     void setPreviousVersion(const QString &v);
     void setProgressPercent(int v);
+    void setHasPercent(bool v);
     void setProgressMessage(const QString &v);
+    void setDownloadSize(const QString &v);
+    void setDownloadedSize(const QString &v);
+    void startDiskProgress();
+    void stopDiskProgress();
     void setAutoUpdateEnabled(bool v);
     void setUpdateAvailable(bool v);
     void setBusy(bool v);
@@ -126,7 +142,13 @@ private:
     QString m_pendingVersion;
     QString m_previousVersion;
     int     m_progressPercent  = 0;
+    bool    m_hasPercent       = false;
     QString m_progressMessage;
+    QString m_downloadSize;
+    QString m_downloadedSize;
+    quint64 m_downloadBytes    = 0;
+    quint64 m_diskBaseline     = 0;
+    class QTimer *m_diskTimer  = nullptr;
     bool    m_autoUpdateEnabled = false;
     bool    m_updateAvailable   = false;
     bool    m_busy              = false;

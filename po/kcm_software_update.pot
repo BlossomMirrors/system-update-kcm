@@ -134,3 +134,9 @@ msgstr ""
 
 msgid "Version %1"
 msgstr ""
+
+msgid "Approximate download size: %1"
+msgstr ""
+
+msgid "%1 of %2"
+msgstr ""

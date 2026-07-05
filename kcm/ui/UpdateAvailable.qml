@@ -59,6 +59,12 @@ ColumnLayout {
                         text: i18n("Version %1", backend.pendingVersion)
                         opacity: 0.7
                     }
+                    QQC2.Label {
+                        visible: backend.downloadSize !== ""
+                        text: i18n("Approximate download size: %1", backend.downloadSize)
+                        opacity: 0.7
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    }
                 }
 
                 Item { Layout.fillWidth: true }
