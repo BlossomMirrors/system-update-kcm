@@ -63,7 +63,6 @@ ColumnLayout {
 
                 QQC2.Button {
                     id: checkBtn
-                    highlighted: true
                     enabled: !backend.checking
                     leftPadding: Kirigami.Units.largeSpacing
                     rightPadding: Kirigami.Units.largeSpacing
