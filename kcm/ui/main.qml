@@ -107,12 +107,18 @@ KCMUtils.SimpleKCM {
 
     Component {
         id: doneComp
-        DoneView { backend: root.backend }
+        DoneView {
+            backend: root.backend
+            onDismissed: mainLoader.state = "auto"
+        }
     }
 
     Component {
         id: rollbackDoneComp
-        RollbackDone { backend: root.backend }
+        RollbackDone {
+            backend: root.backend
+            onDismissed: mainLoader.state = "auto"
+        }
     }
 
     Component {

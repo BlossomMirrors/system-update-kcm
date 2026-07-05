@@ -6,6 +6,7 @@ import org.kde.kirigami as Kirigami
 ColumnLayout {
     id: root
     required property var backend
+    signal dismissed()
     spacing: Kirigami.Units.largeSpacing
 
     Rectangle {
@@ -66,13 +67,13 @@ ColumnLayout {
 
         QQC2.Button {
             text: i18n("Restart later")
+            onClicked: root.dismissed()
         }
 
         QQC2.Button {
             text: i18n("Restart now")
-            palette.buttonText: Kirigami.Theme.neutralTextColor
             highlighted: true
-            onClicked: { /* systemctl reboot */ }
+            onClicked: backend.rebootSystem()
         }
     }
 

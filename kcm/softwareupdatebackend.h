@@ -24,8 +24,8 @@ public:
 
 Q_SIGNALS:
     void Message(const QString &message);
-    void PercentProgress(quint32 percent);
-    void Finished(const QVariantMap &result);
+    void PercentProgress(const QString &text, quint32 percent);
+    void Finished(bool success, const QString &errorMessage);
 };
 
 class SoftwareUpdateBackend : public QObject
@@ -64,6 +64,7 @@ public:
     Q_INVOKABLE void startRollback();
     Q_INVOKABLE void setAutoUpdate(bool enabled);
     Q_INVOKABLE void checkForUpdates();
+    Q_INVOKABLE void rebootSystem();
 
 Q_SIGNALS:
     void upgradeFinished(bool success);
@@ -83,8 +84,8 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     void onTxnMessage(const QString &msg);
-    void onTxnProgress(quint32 percent);
-    void onTxnFinished(const QVariantMap &result);
+    void onTxnProgress(const QString &text, quint32 percent);
+    void onTxnFinished(bool success, const QString &errorMessage);
 
 private:
     void setCurrentVersion(const QString &v);

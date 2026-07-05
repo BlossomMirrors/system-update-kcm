@@ -128,7 +128,8 @@ ColumnLayout {
                             ? "qrc:/kcm/kcm_software_update/icons/chevron-down.svg"
                             : "qrc:/kcm/kcm_software_update/icons/chevron-right.svg"
                         isMask: true
-                        width: 14; height: 14
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.small
                         color: Kirigami.Theme.textColor
                         opacity: 0.7
                     }
@@ -172,24 +173,9 @@ ColumnLayout {
         Item { Layout.fillWidth: true }
 
         QQC2.Button {
-            id: cancelBtn
-            QQC2.ToolTip.text: i18n("Cancel the update")
-            palette.button: Kirigami.Theme.negativeTextColor
+            icon.name: "dialog-cancel"
+            text: i18n("Cancel")
             onClicked: backend.cancelUpgrade()
-            contentItem: RowLayout {
-                spacing: Kirigami.Units.smallSpacing
-                Kirigami.Icon {
-                    source: "qrc:/kcm/kcm_software_update/icons/x.svg"
-                    isMask: true
-                    color: cancelBtn.palette.buttonText
-                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                }
-                QQC2.Label {
-                    text: i18n("Cancel")
-                    color: cancelBtn.palette.buttonText
-                }
-            }
         }
     }
 }

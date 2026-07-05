@@ -196,6 +196,19 @@ void SoftwareUpdateBackend::setAutoUpdate(bool enabled)
     }
 }
 
+void SoftwareUpdateBackend::rebootSystem()
+{
+    auto *w = new QDBusPendingCallWatcher(
+        authCall("org.freedesktop.login1", "/org/freedesktop/login1",
+                 "org.freedesktop.login1.Manager",
+                 QStringLiteral("Reboot"), {QVariant(true)}), this);
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
+        watcher->deleteLater();
+        if (watcher->isError())
+            Q_EMIT errorOccurred(watcher->error().message());
+    });
+}
+
 void SoftwareUpdateBackend::fetchDeployments()
 {
     // Deployments is a property on the Sysroot object, not a method on the OS object.
@@ -337,19 +350,17 @@ void SoftwareUpdateBackend::onTxnMessage(const QString &msg)
     setProgressMessage(msg);
 }
 
-void SoftwareUpdateBackend::onTxnProgress(quint32 percent)
+void SoftwareUpdateBackend::onTxnProgress(const QString &text, quint32 percent)
 {
+    if (!text.isEmpty())
+        setProgressMessage(text);
     setProgressPercent(static_cast<int>(percent));
 }
 
-void SoftwareUpdateBackend::onTxnFinished(const QVariantMap &result)
+void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMessage)
 {
-    const bool success = result.value(QStringLiteral("success")).toBool();
     if (!success) {
-        QString msg = result.value(QStringLiteral("error-message")).toString();
-        if (msg.isEmpty())
-            msg = i18n("Unknown error");
-        Q_EMIT errorOccurred(msg);
+        Q_EMIT errorOccurred(errorMessage.isEmpty() ? i18n("Unknown error") : errorMessage);
     }
 
     const bool wasRollback = m_txnIsRollback;
