@@ -9,6 +9,7 @@
 #include <QDBusVariant>
 #include <QFile>
 #include <QLocale>
+#include <QRegularExpression>
 #include <QTextStream>
 #include <QTimer>
 
@@ -480,7 +481,9 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
             this, &SoftwareUpdateBackend::onTxnMessage);
     // Container layer downloads only report activity via task texts
     connect(m_txnIface, &RpmOstreeTransaction::TaskBegin,
-            this, &SoftwareUpdateBackend::onTxnMessage);
+            this, &SoftwareUpdateBackend::onTxnTaskBegin);
+    connect(m_txnIface, &RpmOstreeTransaction::TaskEnd,
+            this, &SoftwareUpdateBackend::onTxnTaskEnd);
     connect(m_txnIface, &RpmOstreeTransaction::PercentProgress,
             this, &SoftwareUpdateBackend::onTxnProgress);
     connect(m_txnIface, &RpmOstreeTransaction::Finished,
@@ -491,6 +494,32 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
         openJobView(kind);
     if (kind == TxnKind::Upgrade)
         startDiskProgress();
+}
+
+// Extract the last parenthesized human readable size from a daemon message
+static quint64 parseSizeSuffix(const QString &text)
+{
+    static const QRegularExpression re(QStringLiteral(
+        "\\(([0-9]+(?:[.,][0-9]+)?)[\\s\\x{00a0}]*(B|kB|KB|KiB|MB|MiB|GB|GiB|TB|TiB)\\)"));
+    QRegularExpressionMatch last;
+    auto it = re.globalMatch(text);
+    while (it.hasNext())
+        last = it.next();
+    if (!last.hasMatch())
+        return 0;
+    QString num = last.captured(1);
+    num.replace(QLatin1Char(','), QLatin1Char('.'));
+    const QString unit = last.captured(2);
+    double mult = 1;
+    if (unit == QLatin1String("kB") || unit == QLatin1String("KB")) mult = 1e3;
+    else if (unit == QLatin1String("KiB")) mult = 1024.0;
+    else if (unit == QLatin1String("MB"))  mult = 1e6;
+    else if (unit == QLatin1String("MiB")) mult = 1024.0 * 1024;
+    else if (unit == QLatin1String("GB"))  mult = 1e9;
+    else if (unit == QLatin1String("GiB")) mult = 1024.0 * 1024 * 1024;
+    else if (unit == QLatin1String("TB"))  mult = 1e12;
+    else if (unit == QLatin1String("TiB")) mult = 1024.0 * 1024 * 1024 * 1024;
+    return static_cast<quint64>(num.toDouble() * mult);
 }
 
 // Total received bytes over all physical network interfaces
@@ -518,39 +547,51 @@ static quint64 totalRxBytes()
     return total;
 }
 
-// rpm-ostree reports no byte progress while pulling container layers,
-// so the downloaded amount is estimated from network receive counters
+// rpm-ostree reports no byte progress while pulling container layers.
+// The daemon announces exact task sizes though, so completed tasks are
+// counted precisely and only the running task is interpolated from
+// network receive counters, clamped to that task's size.
 void SoftwareUpdateBackend::startDiskProgress()
 {
-    if (m_downloadBytes == 0)
-        return;
-    m_diskBaseline = totalRxBytes();
-    if (m_diskBaseline == 0)
-        return;
+    m_pullTotalBytes = 0;
+    m_pullCompletedBytes = 0;
+    m_taskActive = false;
 
     if (!m_diskTimer) {
         m_diskTimer = new QTimer(this);
         m_diskTimer->setInterval(1000);
-        connect(m_diskTimer, &QTimer::timeout, this, [this] {
-            const quint64 rx = totalRxBytes();
-            const quint64 used = rx > m_diskBaseline ? rx - m_diskBaseline : 0;
-            if (used == 0)
-                return;
-            const quint64 capped = qMin(used, m_downloadBytes);
-            const int pct = static_cast<int>(
-                qMin<quint64>(99, used * 100 / m_downloadBytes));
-            setHasPercent(true);
-            setDownloadedSize(QLocale().formattedDataSize(static_cast<qint64>(capped)));
-            jobViewCall(QStringLiteral("setProcessedAmount"),
-                        {QVariant::fromValue(capped), QStringLiteral("bytes")});
-            if (pct > m_progressPercent) {
-                setProgressPercent(pct);
-                jobViewCall(QStringLiteral("setPercent"),
-                            {QVariant::fromValue(static_cast<quint32>(pct))});
-            }
-        });
+        connect(m_diskTimer, &QTimer::timeout,
+                this, &SoftwareUpdateBackend::updateDownloadProgress);
     }
     m_diskTimer->start();
+}
+
+void SoftwareUpdateBackend::updateDownloadProgress()
+{
+    const quint64 total = m_pullTotalBytes > 0 ? m_pullTotalBytes : m_downloadBytes;
+    if (total == 0)
+        return;
+
+    quint64 current = m_pullCompletedBytes;
+    if (m_taskActive) {
+        const quint64 rx = totalRxBytes();
+        const quint64 delta = rx > m_taskBaseline ? rx - m_taskBaseline : 0;
+        current += qMin(delta, m_taskBytes);
+    }
+    current = qMin(current, total);
+    if (current == 0)
+        return;
+
+    const int pct = static_cast<int>(qMin<quint64>(99, current * 100 / total));
+    setHasPercent(true);
+    setDownloadedSize(QLocale().formattedDataSize(static_cast<qint64>(current)));
+    jobViewCall(QStringLiteral("setProcessedAmount"),
+                {QVariant::fromValue(current), QStringLiteral("bytes")});
+    if (pct > m_progressPercent) {
+        setProgressPercent(pct);
+        jobViewCall(QStringLiteral("setPercent"),
+                    {QVariant::fromValue(static_cast<quint32>(pct))});
+    }
 }
 
 void SoftwareUpdateBackend::stopDiskProgress()
@@ -648,6 +689,60 @@ void SoftwareUpdateBackend::onTxnMessage(const QString &msg)
     setProgressMessage(msg);
     jobViewCall(QStringLiteral("setDescriptionField"),
                 {QVariant::fromValue(0u), QString(), msg});
+
+    // The daemon announces the exact remaining download at pull start
+    if (msg.contains(QLatin1String("needed:"))) {
+        const quint64 bytes = parseSizeSuffix(msg);
+        if (bytes > 0) {
+            m_pullTotalBytes += bytes;
+            m_downloadBytes = m_pullTotalBytes;
+            setDownloadSize(QLocale().formattedDataSize(
+                static_cast<qint64>(m_pullTotalBytes)));
+            jobViewCall(QStringLiteral("setTotalAmount"),
+                        {QVariant::fromValue(m_pullTotalBytes), QStringLiteral("bytes")});
+        }
+    }
+}
+
+void SoftwareUpdateBackend::onTxnTaskBegin(const QString &text)
+{
+    setProgressMessage(text);
+    jobViewCall(QStringLiteral("setDescriptionField"),
+                {QVariant::fromValue(0u), QString(), text});
+
+    const quint64 bytes = parseSizeSuffix(text);
+    if (bytes > 0) {
+        m_taskBytes = bytes;
+        m_taskBaseline = totalRxBytes();
+        m_taskActive = true;
+    } else if (m_pullCompletedBytes > 0) {
+        // A sizeless task after fetching means staging has begun
+        finishDownloadPhase();
+    }
+}
+
+void SoftwareUpdateBackend::onTxnTaskEnd(const QString &text)
+{
+    Q_UNUSED(text);
+    if (m_taskActive) {
+        m_taskActive = false;
+        m_pullCompletedBytes += m_taskBytes;
+        updateDownloadProgress();
+    }
+    // Parsed sizes are rounded, so treat within two percent as done
+    if (m_pullTotalBytes > 0
+        && m_pullCompletedBytes + m_pullTotalBytes / 50 >= m_pullTotalBytes)
+        finishDownloadPhase();
+}
+
+// Staging writes cannot be measured, so fall back to an indeterminate bar
+void SoftwareUpdateBackend::finishDownloadPhase()
+{
+    if (!m_diskTimer || !m_diskTimer->isActive())
+        return;
+    stopDiskProgress();
+    setHasPercent(false);
+    setProgressPercent(0);
 }
 
 void SoftwareUpdateBackend::onTxnProgress(const QString &text, quint32 percent)

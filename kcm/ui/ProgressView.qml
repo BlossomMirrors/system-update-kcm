@@ -107,10 +107,8 @@ ColumnLayout {
                     }
                     Item { Layout.fillWidth: true }
                     QQC2.Label {
-                        visible: backend.downloadSize !== ""
-                        text: backend.downloadedSize !== ""
-                            ? i18n("%1 of %2", backend.downloadedSize, backend.downloadSize)
-                            : backend.downloadSize
+                        visible: backend.downloadedSize !== ""
+                        text: i18n("%1 of %2", backend.downloadedSize, backend.downloadSize)
                         opacity: 0.7
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
@@ -160,6 +158,7 @@ ColumnLayout {
                     visible: logHeader.logExpanded
 
                     ListView {
+                        clip: true
                         model: logModel
                         delegate: QQC2.Label {
                             width: ListView.view.width

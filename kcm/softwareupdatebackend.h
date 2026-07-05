@@ -105,6 +105,8 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     void onTxnMessage(const QString &msg);
+    void onTxnTaskBegin(const QString &text);
+    void onTxnTaskEnd(const QString &text);
     void onTxnProgress(const QString &text, quint32 percent);
     void onTxnFinished(bool success, const QString &errorMessage);
 
@@ -121,6 +123,8 @@ private:
     void setDownloadedSize(const QString &v);
     void startDiskProgress();
     void stopDiskProgress();
+    void updateDownloadProgress();
+    void finishDownloadPhase();
     void setAutoUpdateEnabled(bool v);
     void setUpdateAvailable(bool v);
     void setBusy(bool v);
@@ -147,7 +151,11 @@ private:
     QString m_downloadSize;
     QString m_downloadedSize;
     quint64 m_downloadBytes    = 0;
-    quint64 m_diskBaseline     = 0;
+    quint64 m_pullTotalBytes   = 0;
+    quint64 m_pullCompletedBytes = 0;
+    quint64 m_taskBytes        = 0;
+    quint64 m_taskBaseline     = 0;
+    bool    m_taskActive       = false;
     class QTimer *m_diskTimer  = nullptr;
     bool    m_autoUpdateEnabled = false;
     bool    m_updateAvailable   = false;

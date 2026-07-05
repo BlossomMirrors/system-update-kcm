@@ -9,10 +9,6 @@ ColumnLayout {
     signal dismissed()
     spacing: Kirigami.Units.largeSpacing
 
-    property var logLines: []
-
-    ListModel { id: logModel }
-
     Rectangle {
         Layout.fillWidth: true
         color: Kirigami.Theme.backgroundColor
@@ -112,55 +108,6 @@ ColumnLayout {
                 }
             }
 
-            // Collapsible log
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 0
-
-                RowLayout {
-                    id: logHeader
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
-                    property bool logExpanded: false
-
-                    TapHandler {
-                        cursorShape: Qt.PointingHandCursor
-                        onTapped: logHeader.logExpanded = !logHeader.logExpanded
-                    }
-
-                    Kirigami.Icon {
-                        source: logHeader.logExpanded
-                            ? "qrc:/kcm/kcm_software_update/icons/chevron-down.svg"
-                            : "qrc:/kcm/kcm_software_update/icons/chevron-right.svg"
-                        isMask: true
-                        width: 14; height: 14
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.7
-                    }
-                    QQC2.Label {
-                        text: i18n("Transaction log")
-                        opacity: 0.7
-                    }
-                    Item { Layout.fillWidth: true }
-                }
-
-                QQC2.ScrollView {
-                    Layout.fillWidth: true
-                    implicitHeight: 120
-                    visible: logHeader.logExpanded
-                    ListView {
-                        model: logModel
-                        delegate: QQC2.Label {
-                            width: ListView.view.width
-                            text: model.line
-                            font.family: "monospace"
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            opacity: 0.8
-                            wrapMode: Text.WrapAnywhere
-                        }
-                    }
-                }
-            }
         }
     }
 
