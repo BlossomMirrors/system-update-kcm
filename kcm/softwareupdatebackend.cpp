@@ -349,32 +349,45 @@ void SoftwareUpdateBackend::fetchDeployments()
 
         QString current, pending, previous;
         QString bootedDigest, pendingDigest;
-        QStringList layeredBooted, layeredStaged;
-        bool hasStaged = false;
+        QStringList layeredBooted, layeredPending;
+        bool hasPending = false;
+        quint64 bootedTs = 0;
+
         for (const auto &dep : std::as_const(deployments)) {
-            const QString version = dep.value(QStringLiteral("version")).toString();
-            const bool booted     = dep.value(QStringLiteral("booted")).toBool();
-            const bool staged     = dep.value(QStringLiteral("staged")).toBool();
-            if (booted && current.isEmpty()) {
-                current = version;
+            if (dep.value(QStringLiteral("booted")).toBool()) {
+                current = dep.value(QStringLiteral("version")).toString();
                 bootedDigest = imageDigest(dep);
+                bootedTs = dep.value(QStringLiteral("timestamp")).toULongLong();
                 m_bootedChecksum = dep.value(QStringLiteral("checksum")).toString();
                 layeredBooted = layeredOf(dep);
-            } else if (staged && pending.isEmpty()) {
+                break;
+            }
+        }
+
+        for (const auto &dep : std::as_const(deployments)) {
+            if (dep.value(QStringLiteral("booted")).toBool())
+                continue;
+            const QString version = dep.value(QStringLiteral("version")).toString();
+            const bool staged     = dep.value(QStringLiteral("staged")).toBool();
+            const quint64 ts      = dep.value(QStringLiteral("timestamp")).toULongLong();
+            // Anything newer than the booted image counts as a pending update,
+            // staged or not; older deployments are rollback targets
+            if ((staged || ts > bootedTs) && pending.isEmpty()) {
                 pending = version;
                 pendingDigest = imageDigest(dep);
-                layeredStaged = layeredOf(dep);
-                hasStaged = true;
-            } else if (!booted && !staged && previous.isEmpty()) {
+                layeredPending = layeredOf(dep);
+                hasPending = true;
+            } else if (!staged && ts <= bootedTs && previous.isEmpty()) {
                 previous = version;
             }
         }
+
         setCurrentVersion(current);
         setPendingVersion(pending);
         setPreviousVersion(previous);
-        // The staged deployment reflects what the next boot and future updates use
-        setLayeredPackages(hasStaged ? layeredStaged : layeredBooted);
-        setUpdateAvailable(!pending.isEmpty() && pendingDigest != bootedDigest);
+        // The pending deployment reflects what the next boot and future updates use
+        setLayeredPackages(hasPending ? layeredPending : layeredBooted);
+        setUpdateAvailable(hasPending && pendingDigest != bootedDigest);
         fetchCachedUpdate();
     });
 }
