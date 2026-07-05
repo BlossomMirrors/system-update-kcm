@@ -143,3 +143,9 @@ msgstr "Pakete entfernen und neu starten"
 
 msgid "Layered packages are being removed"
 msgstr "Zusätzliche Pakete werden entfernt"
+
+msgid "Try again"
+msgstr "Erneut versuchen"
+
+msgid "The update could not be completed."
+msgstr "Die Aktualisierung konnte nicht abgeschlossen werden."

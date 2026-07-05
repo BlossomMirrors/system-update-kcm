@@ -66,22 +66,9 @@ ColumnLayout {
         Layout.fillWidth: true
         Item { Layout.fillWidth: true }
         QQC2.Button {
-            id: retryBtn
+            icon.name: "view-refresh"
+            text: i18n("Try again")
             onClicked: root.retry()
-            contentItem: RowLayout {
-                spacing: Kirigami.Units.smallSpacing
-                Kirigami.Icon {
-                    source: "qrc:/kcm/kcm_software_update/icons/refresh-cw.svg"
-                    isMask: true
-                    color: retryBtn.palette.buttonText
-                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                }
-                QQC2.Label {
-                    text: i18n("Try again")
-                    color: retryBtn.palette.buttonText
-                }
-            }
         }
     }
 

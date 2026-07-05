@@ -54,7 +54,9 @@ ColumnLayout {
                                    Kirigami.Theme.highlightColor.b, 0.18)
                     Kirigami.Icon {
                         anchors.centerIn: parent
-                        source: "qrc:/kcm/kcm_software_update/icons/download.svg"
+                        source: backend.resetting
+                            ? "qrc:/kcm/kcm_software_update/icons/rotate-ccw.svg"
+                            : "qrc:/kcm/kcm_software_update/icons/download.svg"
                         isMask: true
                         width: 32; height: 32
                         color: Kirigami.Theme.highlightColor
@@ -89,12 +91,14 @@ ColumnLayout {
 
                 QQC2.ProgressBar {
                     Layout.fillWidth: true
+                    indeterminate: backend.resetting
                     value: backend.progressPercent / 100.0
                     implicitHeight: 4
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
+                    visible: !backend.resetting
                     QQC2.Label {
                         text: backend.progressPercent + "%"
                         opacity: 0.7
@@ -112,6 +116,7 @@ ColumnLayout {
             // Collapsible transaction log
             ColumnLayout {
                 Layout.fillWidth: true
+                visible: !backend.resetting
                 spacing: 0
 
                 RowLayout {

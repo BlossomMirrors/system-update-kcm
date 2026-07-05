@@ -107,3 +107,9 @@ msgstr ""
 
 msgid "Layered packages are being removed"
 msgstr ""
+
+msgid "Try again"
+msgstr ""
+
+msgid "The update could not be completed."
+msgstr ""
