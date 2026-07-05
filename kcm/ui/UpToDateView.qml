@@ -62,33 +62,10 @@ ColumnLayout {
                 Item { Layout.fillWidth: true }
 
                 QQC2.Button {
-                    id: checkBtn
+                    icon.name: "view-refresh"
+                    text: backend.checking ? i18n("Checking…") : i18n("Check for updates")
                     enabled: !backend.checking
-                    leftPadding: Kirigami.Units.largeSpacing
-                    rightPadding: Kirigami.Units.largeSpacing
                     onClicked: backend.checkForUpdates()
-                    contentItem: RowLayout {
-                        spacing: Kirigami.Units.smallSpacing
-                        QQC2.BusyIndicator {
-                            visible: backend.checking
-                            running: backend.checking
-                            padding: 0
-                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                        }
-                        Kirigami.Icon {
-                            visible: !backend.checking
-                            source: "qrc:/kcm/kcm_software_update/icons/refresh-cw.svg"
-                            isMask: true
-                            color: checkBtn.palette.buttonText
-                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                        }
-                        QQC2.Label {
-                            text: backend.checking ? i18n("Checking…") : i18n("Check for updates")
-                            color: checkBtn.palette.buttonText
-                        }
-                    }
                 }
             }
         }
