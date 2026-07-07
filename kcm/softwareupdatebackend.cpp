@@ -209,7 +209,7 @@ void SoftwareUpdateBackend::setAutoUpdate(bool enabled)
         connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
             watcher->deleteLater();
             if (watcher->isError()) {
-                Q_EMIT errorOccurred(watcher->error().message());
+                // Usually a dismissed auth prompt; snap the switch back quietly
                 readAutoUpdateState();
                 return;
             }
@@ -238,7 +238,7 @@ void SoftwareUpdateBackend::setAutoUpdate(bool enabled)
         connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
             watcher->deleteLater();
             if (watcher->isError()) {
-                Q_EMIT errorOccurred(watcher->error().message());
+                // Usually a dismissed auth prompt; snap the switch back quietly
                 readAutoUpdateState();
                 return;
             }
@@ -467,7 +467,9 @@ void SoftwareUpdateBackend::readAutoUpdateState()
         QDBusPendingReply<QDBusVariant> reply = *watcher;
         const bool enabled = !reply.isError() &&
                              reply.value().variant().toString() == QLatin1String("active");
-        setAutoUpdateEnabled(enabled);
+        // Always notify so the switch snaps back after a dismissed auth prompt
+        m_autoUpdateEnabled = enabled;
+        Q_EMIT autoUpdateEnabledChanged();
     });
 }
 
