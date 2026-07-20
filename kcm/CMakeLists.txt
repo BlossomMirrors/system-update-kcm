@@ -5,6 +5,9 @@ kcoreaddons_add_plugin(kcm_software_update
         softwareupdatebackend.cpp
 )
 
+qt_policy(SET QTP0001 NEW)
+qt_policy(SET QTP0004 NEW)
+
 qt_add_qml_module(kcm_software_update
     URI org.kde.kcm.softwareupdate
     VERSION 1.0
