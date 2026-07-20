@@ -7,8 +7,12 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QDBusVariant>
+#include <QElapsedTimer>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLocale>
+#include <QProcess>
 #include <QRegularExpression>
 #include <QTextStream>
 #include <QTimer>
@@ -32,22 +36,72 @@ static constexpr auto JOBVIEW_SERVER_PATH  = "/JobViewServer";
 static constexpr auto JOBVIEW_SERVER_IFACE = "org.kde.JobViewServer";
 static constexpr auto JOBVIEW_IFACE        = "org.kde.JobViewV2";
 
+// Extract a KEY=value or KEY="value" line from os-release formatted text
+static QString parseOsReleaseField(QTextStream &in, const QString &key)
+{
+    const QString prefix = key + QLatin1Char('=');
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+        if (line.startsWith(prefix)) {
+            QString value = line.mid(prefix.length());
+            if (value.startsWith(QLatin1Char('"')))
+                value = value.mid(1, value.length() - 2);
+            return value;
+        }
+    }
+    return {};
+}
+
 static QString readOsName()
 {
     QFile f(QStringLiteral("/etc/os-release"));
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
         return QStringLiteral("Linux");
     QTextStream in(&f);
-    while (!in.atEnd()) {
-        QString line = in.readLine().trimmed();
-        if (line.startsWith(QLatin1String("NAME="))) {
-            QString name = line.mid(5);
-            if (name.startsWith(QLatin1Char('"')))
-                name = name.mid(1, name.length() - 2);
-            return name;
-        }
+    const QString name = parseOsReleaseField(in, QStringLiteral("PRETTY_NAME"));
+    return name.isEmpty() ? QStringLiteral("Linux") : name;
+}
+
+// Pull org.opencontainers.image.version out of an OCI image config blob,
+// as returned either by `skopeo inspect --config` or embedded locally in
+// an rpm-ostree deployment's base-commit-meta
+static QString extractImageVersionLabel(const QByteArray &configJson)
+{
+    const QJsonObject config =
+        QJsonDocument::fromJson(configJson).object().value(QStringLiteral("config")).toObject();
+    return config.value(QStringLiteral("Labels")).toObject()
+                 .value(QStringLiteral("org.opencontainers.image.version")).toString();
+}
+
+// PRETTY_NAME always embeds the version as "Version: <ver>"; swap in a new
+// version without hardcoding the surrounding branding text
+static QString withImageVersion(const QString &prettyName, const QString &version)
+{
+    static const QRegularExpression re(QStringLiteral("Version:\\s*[^)\"]*"));
+    if (!prettyName.contains(re))
+        return prettyName;
+    QString result = prettyName;
+    result.replace(re, QStringLiteral("Version: ") + version);
+    return result;
+}
+
+// Turn an rpm-ostree origin string (e.g. "ostree-unverified-registry:host/repo:tag"
+// or "ostree-image-signed:docker://host/repo:tag") into a skopeo image reference
+static QString toSkopeoReference(const QString &origin)
+{
+    const int colon = origin.indexOf(QLatin1Char(':'));
+    if (colon < 0)
+        return {};
+    const QString scheme = origin.left(colon);
+    QString remainder = origin.mid(colon + 1);
+    if (scheme == QLatin1String("ostree-remote-registry")) {
+        const int second = remainder.indexOf(QLatin1Char(':'));
+        if (second < 0)
+            return {};
+        remainder = remainder.mid(second + 1);
     }
-    return QStringLiteral("Linux");
+    return remainder.startsWith(QLatin1String("docker://"))
+        ? remainder : QLatin1String("docker://") + remainder;
 }
 
 SoftwareUpdateBackend::SoftwareUpdateBackend(QObject *parent)
@@ -322,13 +376,21 @@ void SoftwareUpdateBackend::fetchDeployments()
         }
         outerArg.endArray();
 
-        // Extract the container image digest from base-commit-meta (nested a{sv}).
-        auto imageDigest = [](const QVariantMap &dep) -> QString {
+        // Extract fields from base-commit-meta (nested a{sv})
+        auto commitMeta = [](const QVariantMap &dep) -> QVariantMap {
             const QVariant v = dep.value(QStringLiteral("base-commit-meta"));
             if (!v.canConvert<QDBusArgument>()) return {};
             QVariantMap meta;
             qvariant_cast<QDBusArgument>(v) >> meta;
-            return meta.value(QStringLiteral("ostree.manifest-digest")).toString();
+            return meta;
+        };
+        auto imageDigest = [&commitMeta](const QVariantMap &dep) -> QString {
+            return commitMeta(dep).value(QStringLiteral("ostree.manifest-digest")).toString();
+        };
+        // The full OCI image config is embedded here too, so the version
+        // label can be read without any network access for a staged deployment
+        auto imageConfigJson = [&commitMeta](const QVariantMap &dep) -> QString {
+            return commitMeta(dep).value(QStringLiteral("ostree.container.image-config")).toString();
         };
 
         auto stringList = [](const QVariant &v) -> QStringList {
@@ -348,7 +410,7 @@ void SoftwareUpdateBackend::fetchDeployments()
         };
 
         QString current, pending, previous;
-        QString bootedDigest, pendingDigest;
+        QString bootedDigest, pendingDigest, pendingImageConfig;
         QStringList layeredBooted, layeredPending;
         bool hasPending = false;
         quint64 bootedTs = 0;
@@ -375,6 +437,7 @@ void SoftwareUpdateBackend::fetchDeployments()
             if ((staged || ts > bootedTs) && pending.isEmpty()) {
                 pending = version;
                 pendingDigest = imageDigest(dep);
+                pendingImageConfig = imageConfigJson(dep);
                 layeredPending = layeredOf(dep);
                 hasPending = true;
             } else if (!staged && ts <= bootedTs && previous.isEmpty()) {
@@ -382,12 +445,17 @@ void SoftwareUpdateBackend::fetchDeployments()
             }
         }
 
+        const bool depUpdateAvailable = hasPending && pendingDigest != bootedDigest;
         setCurrentVersion(current);
         setPendingVersion(pending);
         setPreviousVersion(previous);
         // The pending deployment reflects what the next boot and future updates use
         setLayeredPackages(hasPending ? layeredPending : layeredBooted);
-        setUpdateAvailable(hasPending && pendingDigest != bootedDigest);
+        setUpdateAvailable(depUpdateAvailable);
+        if (depUpdateAvailable) {
+            const QString version = extractImageVersionLabel(pendingImageConfig.toUtf8());
+            setOsName(version.isEmpty() ? readOsName() : withImageVersion(readOsName(), version));
+        }
         fetchCachedUpdate();
     });
 }
@@ -407,6 +475,9 @@ void SoftwareUpdateBackend::fetchCachedUpdate()
     connect(w, &QDBusPendingCallWatcher::finished, this, [this, iface](QDBusPendingCallWatcher *watcher) {
         iface->deleteLater();
         watcher->deleteLater();
+        // The deployment list already resolved a stronger signal; do not
+        // reissue the skopeo lookup or fall back to the local name
+        const bool alreadyAvailable = m_updateAvailable;
         QDBusPendingReply<QDBusVariant> reply = *watcher;
         if (!reply.isError()) {
             QVariantMap update;
@@ -438,11 +509,17 @@ void SoftwareUpdateBackend::fetchCachedUpdate()
                 if (m_pendingVersion.isEmpty() && !version.isEmpty())
                     setPendingVersion(version);
                 setUpdateAvailable(true);
+                if (!alreadyAvailable)
+                    fetchRemoteOsName(update.value(QStringLiteral("origin")).toString());
+            } else if (!alreadyAvailable) {
+                setOsName(readOsName());
             }
             m_downloadBytes = available ? addedSize : 0;
             setDownloadSize(available && addedSize > 0
                 ? QLocale().formattedDataSize(static_cast<qint64>(addedSize))
                 : QString());
+        } else if (!alreadyAvailable) {
+            setOsName(readOsName());
         }
         setChecking(false);
     });
@@ -571,6 +648,8 @@ void SoftwareUpdateBackend::startDiskProgress()
     m_pullTotalBytes = 0;
     m_pullCompletedBytes = 0;
     m_taskActive = false;
+    m_lastProcessedBytes = 0;
+    m_speedTimer.start();
 
     if (!m_diskTimer) {
         m_diskTimer = new QTimer(this);
@@ -596,6 +675,14 @@ void SoftwareUpdateBackend::updateDownloadProgress()
     current = qMin(current, total);
     if (current == 0)
         return;
+
+    const qint64 elapsedMs = m_speedTimer.restart();
+    const quint64 bytesDelta =
+        current > m_lastProcessedBytes ? current - m_lastProcessedBytes : 0;
+    m_lastProcessedBytes = current;
+    if (elapsedMs > 0)
+        jobViewCall(QStringLiteral("setSpeed"),
+                    {QVariant::fromValue(bytesDelta * 1000 / static_cast<quint64>(elapsedMs))});
 
     const int pct = static_cast<int>(qMin<quint64>(99, current * 100 / total));
     setHasPercent(true);
@@ -806,6 +893,37 @@ void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMess
         Q_EMIT upgradeFinished(success);
         break;
     }
+}
+
+void SoftwareUpdateBackend::setOsName(const QString &v)
+{
+    if (m_osName == v) return;
+    m_osName = v;
+    Q_EMIT osNameChanged();
+}
+
+// No local metadata is available yet for a merely cached (not staged) update,
+// so read just the image's manifest and config over the registry API. This is
+// a couple of small JSON documents, not a pull of the (multi-gigabyte) image.
+void SoftwareUpdateBackend::fetchRemoteOsName(const QString &origin)
+{
+    const QString ref = toSkopeoReference(origin);
+    if (ref.isEmpty()) {
+        setOsName(readOsName());
+        return;
+    }
+
+    auto *proc = new QProcess(this);
+    connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+            this, [this, proc](int exitCode, QProcess::ExitStatus status) {
+        proc->deleteLater();
+        QString version;
+        if (exitCode == 0 && status == QProcess::NormalExit)
+            version = extractImageVersionLabel(proc->readAllStandardOutput());
+        setOsName(version.isEmpty() ? readOsName() : withImageVersion(readOsName(), version));
+    });
+    proc->start(QStringLiteral("skopeo"),
+                {QStringLiteral("inspect"), QStringLiteral("--config"), ref});
 }
 
 void SoftwareUpdateBackend::setCurrentVersion(const QString &v)

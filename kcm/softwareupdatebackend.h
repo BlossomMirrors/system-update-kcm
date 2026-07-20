@@ -2,6 +2,7 @@
 #include <QDBusAbstractInterface>
 #include <QDBusConnection>
 #include <QDBusPendingReply>
+#include <QElapsedTimer>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -113,6 +114,8 @@ private Q_SLOTS:
 private:
     enum class TxnKind { Upgrade, Rollback, Reset, Check };
 
+    void setOsName(const QString &v);
+    void fetchRemoteOsName(const QString &origin);
     void setCurrentVersion(const QString &v);
     void setPendingVersion(const QString &v);
     void setPreviousVersion(const QString &v);
@@ -156,6 +159,8 @@ private:
     quint64 m_taskBytes        = 0;
     quint64 m_taskBaseline     = 0;
     bool    m_taskActive       = false;
+    quint64 m_lastProcessedBytes = 0;
+    QElapsedTimer m_speedTimer;
     class QTimer *m_diskTimer  = nullptr;
     bool    m_autoUpdateEnabled = false;
     bool    m_updateAvailable   = false;
