@@ -12,6 +12,7 @@ qt_add_qml_module(kcm_software_update
     URI org.kde.kcm.softwareupdate
     VERSION 1.0
     NO_PLUGIN
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/org/kde/kcm/softwareupdate"
     SOURCES
         softwareupdatebackend.h
     QML_FILES
