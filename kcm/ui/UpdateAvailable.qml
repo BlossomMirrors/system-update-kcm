@@ -88,6 +88,17 @@ ColumnLayout {
                 wrapMode: Text.WordWrap
                 opacity: 0.85
             }
+
+            QQC2.Label {
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                text: "<a href=\"https://help.blossomos.org/latestchangelog\">"
+                    + i18n("Read the changelog") + "</a>"
+                onLinkActivated: link => Qt.openUrlExternally(link)
+
+                HoverHandler {
+                    cursorShape: Qt.PointingHandCursor
+                }
+            }
         }
     }
 

@@ -176,3 +176,6 @@ msgstr "Ungefähre Downloadgröße: %1"
 
 msgid "%1 of %2"
 msgstr "%1 von %2"
+
+msgid "Read the changelog"
+msgstr "Änderungsprotokoll lesen"
