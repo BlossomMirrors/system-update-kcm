@@ -10,19 +10,14 @@ ColumnLayout {
 
     spacing: Kirigami.Units.largeSpacing
 
-    Rectangle {
+    Kirigami.AbstractCard {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: schedRow.implicitHeight + Kirigami.Units.gridUnit * 2
+        leftPadding: Kirigami.Units.gridUnit
+        rightPadding: Kirigami.Units.gridUnit
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
 
-        RowLayout {
-            id: schedRow
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Kirigami.Units.gridUnit }
+        contentItem: RowLayout {
             spacing: Kirigami.Units.largeSpacing
 
             Rectangle {
@@ -66,25 +61,12 @@ ColumnLayout {
         }
     }
 
-    Rectangle {
+    Kirigami.InlineMessage {
         Layout.fillWidth: true
-        color: Qt.rgba(Kirigami.Theme.textColor.r,
-                       Kirigami.Theme.textColor.g,
-                       Kirigami.Theme.textColor.b, 0.05)
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: discLabel.implicitHeight + Kirigami.Units.gridUnit * 2
-
-        QQC2.Label {
-            id: discLabel
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Kirigami.Units.gridUnit }
-            text: i18n("Updates are applied atomically and can always be rolled back. Your files and settings are never affected.")
-            wrapMode: Text.WordWrap
-            opacity: 0.7
-        }
+        Layout.topMargin: Kirigami.Units.smallSpacing
+        visible: true
+        type: Kirigami.MessageType.Information
+        text: i18n("Updates are applied atomically and can always be rolled back. Your files and settings are never affected.")
     }
 
     Item { Layout.fillHeight: true }

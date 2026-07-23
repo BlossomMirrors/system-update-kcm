@@ -12,7 +12,7 @@ include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(FeatureSummary)
 
-find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml Quick)
+find_package(Qt6 REQUIRED COMPONENTS Core DBus Network Qml Quick)
 find_package(KF6 REQUIRED COMPONENTS CoreAddons I18n KCMUtils)
 
 add_subdirectory(kcm)

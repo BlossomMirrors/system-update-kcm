@@ -9,22 +9,14 @@ ColumnLayout {
     signal dismissed()
     spacing: Kirigami.Units.largeSpacing
 
-    Rectangle {
+    Kirigami.AbstractCard {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: rbDoneRow.implicitHeight + Kirigami.Units.gridUnit * 2
+        leftPadding: Kirigami.Units.gridUnit
+        rightPadding: Kirigami.Units.gridUnit
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
 
-        RowLayout {
-            id: rbDoneRow
-            anchors {
-                left: parent.left; right: parent.right; top: parent.top
-                margins: Kirigami.Units.gridUnit
-            }
+        contentItem: RowLayout {
             spacing: Kirigami.Units.largeSpacing
 
             Rectangle {

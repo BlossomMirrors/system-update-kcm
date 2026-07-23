@@ -65,6 +65,7 @@ target_link_libraries(kcm_software_update
     PRIVATE
         Qt6::Core
         Qt6::DBus
+        Qt6::Network
         Qt6::Qml
         Qt6::Quick
         KF6::CoreAddons

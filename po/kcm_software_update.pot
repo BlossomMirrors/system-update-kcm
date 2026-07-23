@@ -141,5 +141,8 @@ msgstr ""
 msgid "%1 of %2"
 msgstr ""
 
-msgid "Read the changelog"
+msgid "What's new"
+msgstr ""
+
+msgid "Read the full changelog"
 msgstr ""

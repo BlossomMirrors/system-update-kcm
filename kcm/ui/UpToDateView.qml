@@ -10,81 +10,63 @@ ColumnLayout {
 
     spacing: Kirigami.Units.largeSpacing
 
-    Rectangle {
+    Kirigami.AbstractCard {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: headerCol.implicitHeight + Kirigami.Units.gridUnit * 2
+        leftPadding: Kirigami.Units.gridUnit
+        rightPadding: Kirigami.Units.gridUnit
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
 
-        ColumnLayout {
-            id: headerCol
-            anchors {
-                left: parent.left; right: parent.right; top: parent.top
-                margins: Kirigami.Units.gridUnit
+        contentItem: RowLayout {
+            spacing: Kirigami.Units.largeSpacing
+
+            Rectangle {
+                width: 56; height: 56; radius: 28
+                color: Qt.rgba(Kirigami.Theme.positiveTextColor.r,
+                               Kirigami.Theme.positiveTextColor.g,
+                               Kirigami.Theme.positiveTextColor.b, 0.18)
+                Kirigami.Icon {
+                    anchors.centerIn: parent
+                    source: "qrc:/kcm/kcm_software_update/icons/check.svg"
+                    isMask: true
+                    width: 32; height: 32
+                    color: Kirigami.Theme.positiveTextColor
+                }
             }
-            spacing: 0
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.largeSpacing
-
-                Rectangle {
-                    width: 56; height: 56; radius: 28
-                    color: Qt.rgba(Kirigami.Theme.positiveTextColor.r,
-                                   Kirigami.Theme.positiveTextColor.g,
-                                   Kirigami.Theme.positiveTextColor.b, 0.18)
-                    Kirigami.Icon {
-                        anchors.centerIn: parent
-                        source: "qrc:/kcm/kcm_software_update/icons/check.svg"
-                        isMask: true
-                        width: 32; height: 32
-                        color: Kirigami.Theme.positiveTextColor
-                    }
+            ColumnLayout {
+                spacing: 2
+                QQC2.Label {
+                    text: backend.osName
+                    font.bold: true
+                    font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.1)
                 }
-
-                ColumnLayout {
-                    spacing: 2
-                    QQC2.Label {
-                        text: backend.osName
-                        font.bold: true
-                        font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.1)
-                    }
-                    QQC2.Label {
-                        text: i18n("Your system is up to date.")
-                        opacity: 0.7
-                    }
+                QQC2.Label {
+                    text: i18n("Your system is up to date.")
+                    opacity: 0.7
                 }
+            }
 
-                Item { Layout.fillWidth: true }
+            Item { Layout.fillWidth: true }
 
-                QQC2.Button {
-                    icon.name: "view-refresh"
-                    text: backend.checking ? i18n("Checking…") : i18n("Check for updates")
-                    enabled: !backend.checking
-                    onClicked: backend.checkForUpdates()
-                }
+            QQC2.Button {
+                icon.name: "view-refresh"
+                text: backend.checking ? i18n("Checking…") : i18n("Check for updates")
+                enabled: !backend.checking
+                onClicked: backend.checkForUpdates()
             }
         }
     }
 
-    Rectangle {
+    Kirigami.AbstractCard {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: infoCol.implicitHeight
+        leftPadding: Kirigami.Units.gridUnit
+        rightPadding: Kirigami.Units.gridUnit
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
 
-        ColumnLayout {
-            id: infoCol
-            anchors { left: parent.left; right: parent.right }
-            spacing: 0
+        contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
 
             InfoRow {
                 label: i18n("Installed")
@@ -113,9 +95,11 @@ ColumnLayout {
             InfoRow {
                 visible: backend.previousVersion !== ""
                 label: i18n("Previous version")
+                extraTopMargin: Kirigami.Units.smallSpacing
                 content: RowLayout {
-                    QQC2.Label { text: backend.previousVersion; opacity: 0.7 }
+                    QQC2.Label { text: backend.previousVersion; opacity: 0.7; Layout.topMargin: Kirigami.Units.smallSpacing }
                     QQC2.Button {
+                        Layout.topMargin: Kirigami.Units.smallSpacing
                         text: i18n("Roll back")
                         onClicked: root.requestRollbackConfirm()
                     }
@@ -124,25 +108,12 @@ ColumnLayout {
         }
     }
 
-    Rectangle {
+    Kirigami.InlineMessage {
         Layout.fillWidth: true
-        color: Qt.rgba(Kirigami.Theme.textColor.r,
-                       Kirigami.Theme.textColor.g,
-                       Kirigami.Theme.textColor.b, 0.05)
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: discLabel.implicitHeight + Kirigami.Units.gridUnit * 2
-
-        QQC2.Label {
-            id: discLabel
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Kirigami.Units.gridUnit }
-            text: i18n("Updates are applied atomically and can always be rolled back. Your files and settings are never affected.")
-            wrapMode: Text.WordWrap
-            opacity: 0.7
-        }
+        Layout.topMargin: Kirigami.Units.smallSpacing
+        visible: true
+        type: Kirigami.MessageType.Information
+        text: i18n("Updates are applied atomically and can always be rolled back. Your files and settings are never affected.")
     }
 
     Item { Layout.fillHeight: true }

@@ -9,9 +9,13 @@
 #include <QDBusVariant>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocale>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QTextStream>
@@ -994,6 +998,10 @@ void SoftwareUpdateBackend::setUpdateAvailable(bool v)
     if (m_updateAvailable == v) return;
     m_updateAvailable = v;
     Q_EMIT updateAvailableChanged();
+    if (v)
+        fetchChangelog();
+    else
+        setChangelogEntries({});
 }
 
 void SoftwareUpdateBackend::setBusy(bool v)
@@ -1022,4 +1030,38 @@ void SoftwareUpdateBackend::setLayeredPackages(const QStringList &v)
     if (m_layeredPackages == v) return;
     m_layeredPackages = v;
     Q_EMIT layeredPackagesChanged();
+}
+
+void SoftwareUpdateBackend::setChangelogEntries(const QStringList &v)
+{
+    if (m_changelogEntries == v) return;
+    m_changelogEntries = v;
+    Q_EMIT changelogEntriesChanged();
+}
+
+// changelog.json maps language codes to a short list of bullet points
+// describing the latest release, e.g. {"en": ["..."], "de": ["..."]}
+void SoftwareUpdateBackend::fetchChangelog()
+{
+    if (!m_netManager)
+        m_netManager = new QNetworkAccessManager(this);
+
+    const QUrl url(QStringLiteral("https://cdn.blossomos.org/changelog.json"));
+    auto *reply = m_netManager->get(QNetworkRequest(url));
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError)
+            return;
+
+        const QJsonObject root = QJsonDocument::fromJson(reply->readAll()).object();
+        const QString lang = QLocale::system().name().section(QLatin1Char('_'), 0, 0);
+        QJsonArray entries = root.value(lang).toArray();
+        if (entries.isEmpty())
+            entries = root.value(QStringLiteral("en")).toArray();
+
+        QStringList list;
+        for (const auto &entry : std::as_const(entries))
+            list << entry.toString();
+        setChangelogEntries(list);
+    });
 }

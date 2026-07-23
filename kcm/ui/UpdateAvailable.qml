@@ -12,22 +12,14 @@ ColumnLayout {
     spacing: Kirigami.Units.largeSpacing
 
     // Merged top card: header row + divider + description
-    Rectangle {
+    Kirigami.AbstractCard {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: topCardCol.implicitHeight + Kirigami.Units.gridUnit * 2
+        leftPadding: Kirigami.Units.gridUnit
+        rightPadding: Kirigami.Units.gridUnit
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
 
-        ColumnLayout {
-            id: topCardCol
-            anchors {
-                left: parent.left; right: parent.right; top: parent.top
-                margins: Kirigami.Units.gridUnit
-            }
+        contentItem: ColumnLayout {
             spacing: 0
 
             RowLayout {
@@ -88,11 +80,49 @@ ColumnLayout {
                 wrapMode: Text.WordWrap
                 opacity: 0.85
             }
+        }
+    }
+
+    // What's new: short summary fetched from the changelog feed
+    Kirigami.AbstractCard {
+        Layout.fillWidth: true
+        visible: backend.changelogEntries.length > 0
+        leftPadding: Kirigami.Units.gridUnit
+        rightPadding: Kirigami.Units.gridUnit
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
+
+        contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Label {
+                Layout.fillWidth: true
+                text: i18n("What's new")
+                font.bold: true
+            }
+
+            Repeater {
+                model: backend.changelogEntries
+                delegate: RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+                    QQC2.Label {
+                        text: "•"
+                        opacity: 0.7
+                    }
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: modelData
+                        wrapMode: Text.WordWrap
+                        opacity: 0.85
+                    }
+                }
+            }
 
             QQC2.Label {
                 Layout.topMargin: Kirigami.Units.smallSpacing
                 text: "<a href=\"https://help.blossomos.org/latestchangelog\">"
-                    + i18n("Read the changelog") + "</a>"
+                    + i18n("Read the full changelog") + "</a>"
                 onLinkActivated: link => Qt.openUrlExternally(link)
 
                 HoverHandler {
@@ -103,20 +133,15 @@ ColumnLayout {
     }
 
     // Info rows: installed, auto-update toggle, previous version
-    Rectangle {
+    Kirigami.AbstractCard {
         Layout.fillWidth: true
-        color: Kirigami.Theme.backgroundColor
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: infoCol.implicitHeight
+        leftPadding: Kirigami.Units.gridUnit
+        rightPadding: Kirigami.Units.gridUnit
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
 
-        ColumnLayout {
-            id: infoCol
-            anchors { left: parent.left; right: parent.right }
-            spacing: 0
+        contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
 
             InfoRow {
                 label: i18n("Installed")
@@ -145,9 +170,11 @@ ColumnLayout {
             InfoRow {
                 visible: backend.previousVersion !== ""
                 label: i18n("Previous version")
+                extraTopMargin: Kirigami.Units.smallSpacing
                 content: RowLayout {
-                    QQC2.Label { text: backend.previousVersion; opacity: 0.7 }
+                    QQC2.Label { text: backend.previousVersion; opacity: 0.7; Layout.topMargin: Kirigami.Units.smallSpacing }
                     QQC2.Button {
+                        Layout.topMargin: Kirigami.Units.smallSpacing
                         text: i18n("Roll back")
                         onClicked: root.requestRollbackConfirm()
                     }
@@ -157,25 +184,12 @@ ColumnLayout {
     }
 
     // Disclaimer
-    Rectangle {
+    Kirigami.InlineMessage {
         Layout.fillWidth: true
-        color: Qt.rgba(Kirigami.Theme.textColor.r,
-                       Kirigami.Theme.textColor.g,
-                       Kirigami.Theme.textColor.b, 0.05)
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r,
-                              Kirigami.Theme.textColor.g,
-                              Kirigami.Theme.textColor.b, 0.12)
-        border.width: 1
-        radius: Kirigami.Units.largeSpacing
-        implicitHeight: discLabel.implicitHeight + Kirigami.Units.gridUnit * 2
-
-        QQC2.Label {
-            id: discLabel
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Kirigami.Units.gridUnit }
-            text: i18n("Updates are applied atomically and can always be rolled back. Your files and settings are never affected.")
-            wrapMode: Text.WordWrap
-            opacity: 0.7
-        }
+        Layout.topMargin: Kirigami.Units.smallSpacing
+        visible: true
+        type: Kirigami.MessageType.Information
+        text: i18n("Updates are applied atomically and can always be rolled back. Your files and settings are never affected.")
     }
 
     Item { Layout.fillHeight: true }

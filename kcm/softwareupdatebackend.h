@@ -51,6 +51,7 @@ class SoftwareUpdateBackend : public QObject
     Q_PROPERTY(bool checking           READ checking          NOTIFY checkingChanged)
     Q_PROPERTY(bool resetting          READ resetting         NOTIFY resettingChanged)
     Q_PROPERTY(QStringList layeredPackages READ layeredPackages NOTIFY layeredPackagesChanged)
+    Q_PROPERTY(QStringList changelogEntries READ changelogEntries NOTIFY changelogEntriesChanged)
 
 public:
     explicit SoftwareUpdateBackend(QObject *parent = nullptr);
@@ -71,6 +72,7 @@ public:
     bool checking()           const { return m_checking; }
     bool resetting()          const { return m_resetting; }
     QStringList layeredPackages() const { return m_layeredPackages; }
+    QStringList changelogEntries() const { return m_changelogEntries; }
 
     Q_INVOKABLE void startUpgrade();
     Q_INVOKABLE void scheduleUpgrade();
@@ -103,6 +105,7 @@ Q_SIGNALS:
     void checkingChanged();
     void resettingChanged();
     void layeredPackagesChanged();
+    void changelogEntriesChanged();
 
 private Q_SLOTS:
     void onTxnMessage(const QString &msg);
@@ -134,6 +137,8 @@ private:
     void setChecking(bool v);
     void setResetting(bool v);
     void setLayeredPackages(const QStringList &v);
+    void setChangelogEntries(const QStringList &v);
+    void fetchChangelog();
 
     void fetchDeployments();
     void fetchCachedUpdate();
@@ -168,6 +173,8 @@ private:
     bool    m_checking          = false;
     bool    m_resetting         = false;
     QStringList m_layeredPackages;
+    QStringList m_changelogEntries;
+    class QNetworkAccessManager *m_netManager = nullptr;
     TxnKind m_txnKind           = TxnKind::Upgrade;
 
     QString              m_bootedChecksum;

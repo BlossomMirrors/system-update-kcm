@@ -82,66 +82,23 @@ KCMUtils.SimpleKCM {
         }
         spacing: Kirigami.Units.largeSpacing
 
-        Rectangle {
+        Kirigami.InlineMessage {
             Layout.fillWidth: true
             visible: root.backend && root.backend.layeredPackages.length > 0
                      && (mainLoader.effectiveView === "upToDate"
                          || mainLoader.effectiveView === "updateAvailable")
-            color: Qt.rgba(Kirigami.Theme.negativeTextColor.r,
-                           Kirigami.Theme.negativeTextColor.g,
-                           Kirigami.Theme.negativeTextColor.b, 0.08)
-            border.color: Qt.rgba(Kirigami.Theme.negativeTextColor.r,
-                                  Kirigami.Theme.negativeTextColor.g,
-                                  Kirigami.Theme.negativeTextColor.b, 0.25)
-            border.width: 1
-            radius: Kirigami.Units.largeSpacing
-            implicitHeight: layeredRow.implicitHeight + Kirigami.Units.gridUnit * 2
+            type: Kirigami.MessageType.Error
+            text: "<b>" + i18n("System updates are paused") + "</b><br>"
+                + i18n("Packages layered with rpm-ostree prevent updates: %1",
+                       root.backend ? root.backend.layeredPackages.join(", ") : "")
 
-            RowLayout {
-                id: layeredRow
-                anchors {
-                    left: parent.left; right: parent.right; top: parent.top
-                    margins: Kirigami.Units.gridUnit
-                }
-                spacing: Kirigami.Units.largeSpacing
-
-                Rectangle {
-                    width: 56; height: 56; radius: 28
-                    color: Qt.rgba(Kirigami.Theme.negativeTextColor.r,
-                                   Kirigami.Theme.negativeTextColor.g,
-                                   Kirigami.Theme.negativeTextColor.b, 0.18)
-                    Kirigami.Icon {
-                        anchors.centerIn: parent
-                        source: "qrc:/kcm/kcm_software_update/icons/alert-circle.svg"
-                        isMask: true
-                        width: 32; height: 32
-                        color: Kirigami.Theme.negativeTextColor
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-                    QQC2.Label {
-                        text: i18n("System updates are paused")
-                        font.bold: true
-                        font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.05)
-                    }
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Packages layered with rpm-ostree prevent updates: %1",
-                                   root.backend ? root.backend.layeredPackages.join(", ") : "")
-                        opacity: 0.7
-                        wrapMode: Text.WordWrap
-                    }
-                }
-
-                QQC2.Button {
+            actions: [
+                Kirigami.Action {
                     text: i18n("Remove packages…")
                     icon.name: "edit-delete"
-                    onClicked: resetDialog.open()
+                    onTriggered: resetDialog.open()
                 }
-            }
+            ]
         }
 
         // Drives view transitions via state machine so we never push/pop on SimpleKCM
