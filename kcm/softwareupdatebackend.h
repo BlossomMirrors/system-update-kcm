@@ -118,7 +118,7 @@ private:
     enum class TxnKind { Upgrade, Rollback, Reset, Check };
 
     void setOsName(const QString &v);
-    void fetchRemoteOsName(const QString &origin);
+    void fetchRemoteOsName();
     void setCurrentVersion(const QString &v);
     void setPendingVersion(const QString &v);
     void setPreviousVersion(const QString &v);
