@@ -115,7 +115,7 @@ msgstr ""
 msgid "The update could not be completed."
 msgstr ""
 
-msgid "Updating %1"
+msgid "Downloading %1"
 msgstr ""
 
 msgid "Rolling back %1"

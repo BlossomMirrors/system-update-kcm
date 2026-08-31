@@ -677,7 +677,7 @@ void SoftwareUpdateBackend::openJobView(TxnKind kind)
     switch (kind) {
     case TxnKind::Rollback: title = i18n("Rolling back %1", m_osName); break;
     case TxnKind::Reset:    title = i18n("Removing layered packages"); break;
-    case TxnKind::Upgrade:  title = i18n("Updating %1", m_osName); break;
+    case TxnKind::Upgrade:  title = i18n("Downloading %1", m_osName); break;
     case TxnKind::Check:    return;
     }
 

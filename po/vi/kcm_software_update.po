@@ -122,7 +122,7 @@ msgstr "Thử lại"
 msgid "The update could not be completed."
 msgstr "Phiên cập nhật không thể hoản thành."
 
-msgid "Updating %1"
+msgid "Downloading %1"
 msgstr "Đang cập nhật %1"
 
 msgid "Rolling back %1"

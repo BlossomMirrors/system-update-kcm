@@ -150,8 +150,8 @@ msgstr "Erneut versuchen"
 msgid "The update could not be completed."
 msgstr "Die Aktualisierung konnte nicht abgeschlossen werden."
 
-msgid "Updating %1"
-msgstr "%1 wird aktualisiert"
+msgid "Downloading %1"
+msgstr "%1 wird heruntergeladen"
 
 msgid "Rolling back %1"
 msgstr "%1 wird zurückgesetzt"
