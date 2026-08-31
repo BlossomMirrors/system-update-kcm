@@ -37,6 +37,7 @@ class SoftwareUpdateBackend : public QObject
     Q_OBJECT
     QML_ANONYMOUS
     Q_PROPERTY(QString osName          READ osName          NOTIFY osNameChanged)
+    Q_PROPERTY(QString installedOsName READ installedOsName CONSTANT)
     Q_PROPERTY(QString currentVersion  READ currentVersion  NOTIFY currentVersionChanged)
     Q_PROPERTY(QString pendingVersion  READ pendingVersion  NOTIFY pendingVersionChanged)
     Q_PROPERTY(QString previousVersion READ previousVersion NOTIFY previousVersionChanged)
@@ -58,6 +59,7 @@ public:
     ~SoftwareUpdateBackend() override;
 
     QString osName()          const { return m_osName; }
+    QString installedOsName() const;
     QString currentVersion()  const { return m_currentVersion; }
     QString pendingVersion()  const { return m_pendingVersion; }
     QString previousVersion() const { return m_previousVersion; }

@@ -70,7 +70,7 @@ ColumnLayout {
 
             InfoRow {
                 label: i18n("Installed")
-                value: backend.osName + " " + backend.currentVersion
+                value: backend.installedOsName + " " + backend.currentVersion
             }
 
             Kirigami.Separator { Layout.fillWidth: true }

@@ -76,6 +76,13 @@ SoftwareUpdateBackend::SoftwareUpdateBackend(QObject *parent)
     , m_osName(readOsName())
 {}
 
+// The locally installed system's own name, independent of osName which may
+// be showing a pending update's remote branding instead
+QString SoftwareUpdateBackend::installedOsName() const
+{
+    return readOsName();
+}
+
 SoftwareUpdateBackend::~SoftwareUpdateBackend()
 {
     closeJobView(QString());

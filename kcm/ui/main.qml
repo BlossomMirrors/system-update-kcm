@@ -59,7 +59,7 @@ KCMUtils.SimpleKCM {
         title: i18n("Roll back to previous version?")
         subtitle: root.backend
             ? i18n("The system will then restart with %1 %2.",
-                   root.backend.osName, root.backend.previousVersion) + "\n\n"
+                   root.backend.installedOsName, root.backend.previousVersion) + "\n\n"
               + i18n("Your files and settings stay unchanged. You can always update to the latest version again afterwards.")
             : ""
         standardButtons: Kirigami.Dialog.Cancel
