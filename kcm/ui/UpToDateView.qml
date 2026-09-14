@@ -53,6 +53,7 @@ ColumnLayout {
                 icon.name: "view-refresh"
                 text: backend.checking ? i18n("Checking…") : i18n("Check for updates")
                 enabled: !backend.checking
+                focusPolicy: Qt.NoFocus
                 onClicked: backend.checkForUpdates()
             }
         }
