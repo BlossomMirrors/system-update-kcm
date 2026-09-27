@@ -3,6 +3,7 @@ kcoreaddons_add_plugin(kcm_software_update
     SOURCES
         kcm_software_update.cpp
         softwareupdatebackend.cpp
+        p2pbackend.cpp
 )
 
 qt_policy(SET QTP0001 NEW)
@@ -15,6 +16,7 @@ qt_add_qml_module(kcm_software_update
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/org/kde/kcm/softwareupdate"
     SOURCES
         softwareupdatebackend.h
+        p2pbackend.h
     QML_FILES
         ui/main.qml
         ui/UpdateAvailable.qml
@@ -25,6 +27,7 @@ qt_add_qml_module(kcm_software_update
         ui/ScheduledView.qml
         ui/ErrorView.qml
         ui/InfoRow.qml
+        ui/P2pRow.qml
 )
 
 qt_add_resources(kcm_software_update "kcm_icons"
@@ -56,6 +59,7 @@ qt_add_resources(kcm_software_update "qml_kcm_path"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/ScheduledView.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/ErrorView.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/InfoRow.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/P2pRow.qml"
 )
 
 target_compile_definitions(kcm_software_update
