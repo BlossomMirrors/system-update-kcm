@@ -75,11 +75,13 @@ KCMUtils.SimpleKCM {
         ]
     }
 
+    topPadding: 20
+    leftPadding: 20
+    rightPadding: 20
+    bottomPadding: 20
+
     ColumnLayout {
-        anchors {
-            fill: parent
-            margins: 20
-        }
+        height: parent.height
         spacing: Kirigami.Units.largeSpacing
 
         Kirigami.InlineMessage {
@@ -106,6 +108,7 @@ KCMUtils.SimpleKCM {
             id: mainLoader
             Layout.fillWidth: true
             Layout.fillHeight: true
+            implicitHeight: viewLoader.item ? viewLoader.item.implicitHeight : 0
             state: "auto"
 
             states: [
@@ -128,6 +131,7 @@ KCMUtils.SimpleKCM {
             }
 
             Loader {
+                id: viewLoader
                 anchors.fill: parent
                 sourceComponent: {
                     switch (mainLoader.effectiveView) {
