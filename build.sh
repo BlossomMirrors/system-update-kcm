@@ -24,7 +24,7 @@ Version:        $VERSION
 Release:        $RELEASE%{?dist}
 Summary:        BlossomOS KDE System Settings module for OS image updates
 License:        MIT
-URL:            https://codeberg.org/BlossomOS/system-update-kcm
+URL:            https://dev.blossomos.org/blossom/os/core/kcm/system-update-kcm
 
 Source0:        $PACKAGE_NAME-$VERSION.tar.gz
 
