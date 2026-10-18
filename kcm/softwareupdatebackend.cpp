@@ -382,33 +382,33 @@ void SoftwareUpdateBackend::fetchDeployments()
         QString bootedDigest, pendingDigest;
         QStringList layeredBooted, layeredPending;
         bool hasPending = false;
-        quint64 bootedTs = 0;
+        int bootedIdx = -1;
 
-        for (const auto &dep : std::as_const(deployments)) {
+        for (int i = 0; i < deployments.size(); ++i) {
+            const auto &dep = deployments.at(i);
             if (dep.value(QStringLiteral("booted")).toBool()) {
+                bootedIdx = i;
                 current = dep.value(QStringLiteral("version")).toString();
                 bootedDigest = imageDigest(dep);
-                bootedTs = dep.value(QStringLiteral("timestamp")).toULongLong();
                 m_bootedChecksum = dep.value(QStringLiteral("checksum")).toString();
                 layeredBooted = layeredOf(dep);
                 break;
             }
         }
 
-        for (const auto &dep : std::as_const(deployments)) {
+        for (int i = 0; i < deployments.size(); ++i) {
+            const auto &dep = deployments.at(i);
             if (dep.value(QStringLiteral("booted")).toBool())
                 continue;
             const QString version = dep.value(QStringLiteral("version")).toString();
             const bool staged     = dep.value(QStringLiteral("staged")).toBool();
-            const quint64 ts      = dep.value(QStringLiteral("timestamp")).toULongLong();
-            // Anything newer than the booted image counts as a pending update,
-            // staged or not; older deployments are rollback targets
-            if ((staged || ts > bootedTs) && pending.isEmpty()) {
+            const bool beforeBooted = i < bootedIdx;
+            if ((staged || beforeBooted) && pending.isEmpty()) {
                 pending = version;
                 pendingDigest = imageDigest(dep);
                 layeredPending = layeredOf(dep);
                 hasPending = true;
-            } else if (!staged && ts <= bootedTs && previous.isEmpty()) {
+            } else if (!staged && !beforeBooted && previous.isEmpty()) {
                 previous = version;
             }
         }
