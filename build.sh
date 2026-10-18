@@ -2,7 +2,7 @@
 set -e
 
 PACKAGE_NAME=blossom-kcm-software-update
-VERSION=${VERSION:-0.2.4}
+VERSION=${VERSION:-0.3.1}
 RELEASE=${RELEASE:-1}
 BUILDROOT=$(pwd)/rpmbuild
 SPECS_DIR=$BUILDROOT/SPECS
