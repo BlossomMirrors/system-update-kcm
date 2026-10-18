@@ -165,6 +165,10 @@ ColumnLayout {
                 }
             }
 
+            P2pRow {
+                p2p: kcm.p2p
+            }
+
             Kirigami.Separator { Layout.fillWidth: true; visible: backend.previousVersion !== "" }
 
             InfoRow {

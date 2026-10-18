@@ -146,3 +146,18 @@ msgstr ""
 
 msgid "Read the full changelog"
 msgstr ""
+
+msgid "Share updates on local network"
+msgstr ""
+
+msgid "Downloads updates from other computers on this network and shares them in return. This uses several gigabytes of storage."
+msgstr ""
+
+msgid "This setting is managed by your administrator."
+msgstr ""
+
+msgid "Other computers found: %1"
+msgstr ""
+
+msgid "Storage used: %1"
+msgstr ""

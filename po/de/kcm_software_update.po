@@ -182,3 +182,18 @@ msgstr "Neuerungen"
 
 msgid "Read the full changelog"
 msgstr "Vollständiges Änderungsprotokoll lesen"
+
+msgid "Share updates on local network"
+msgstr "Updates im lokalen Netzwerk teilen"
+
+msgid "Downloads updates from other computers on this network and shares them in return. This uses several gigabytes of storage."
+msgstr "Lädt Updates von anderen Computern in diesem Netzwerk herunter und teilt sie im Gegenzug. Dafür werden mehrere Gigabyte Speicherplatz benötigt."
+
+msgid "This setting is managed by your administrator."
+msgstr "Diese Einstellung wird von deinem Administrator verwaltet."
+
+msgid "Other computers found: %1"
+msgstr "Gefundene Computer: %1"
+
+msgid "Storage used: %1"
+msgstr "Belegter Speicher: %1"

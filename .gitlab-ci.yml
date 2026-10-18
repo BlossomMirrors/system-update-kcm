@@ -1,0 +1,59 @@
+stages:
+  - build
+  - release
+
+variables:
+  PACKAGE_NAME: blossom-kcm-software-update
+
+rpm:
+  stage: build
+  image: registry.fedoraproject.org/fedora:44
+  rules:
+    - if: $CI_COMMIT_TAG
+  before_script:
+    - >
+      dnf install -y --setopt=install_weak_deps=False
+      rpm-build tar gzip gettext gcc-c++ cmake ninja-build extra-cmake-modules
+      qt6-qtbase-devel qt6-qtdeclarative-devel
+      kf6-kcoreaddons-devel kf6-ki18n-devel kf6-kcmutils-devel
+  script:
+    - export VERSION=${CI_COMMIT_TAG#v}
+    - ./build.sh
+    - mkdir -p dist
+    - cp rpmbuild/RPMS/*/*.rpm dist/
+  artifacts:
+    paths:
+      - dist/*.rpm
+    expire_in: 1 week
+
+release:
+  stage: release
+  image: registry.fedoraproject.org/fedora:44
+  needs:
+    - rpm
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      set -eu
+      VERSION=${CI_COMMIT_TAG#v}
+      RELEASE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+      STATUS=$(curl -s -o /dev/null -w '%{http_code}' --header "JOB-TOKEN: $CI_JOB_TOKEN" "$RELEASE_URL/$CI_COMMIT_TAG")
+      if [ "$STATUS" = "404" ]; then
+        curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+          --data-urlencode "tag_name=$CI_COMMIT_TAG" \
+          --data-urlencode "name=$CI_COMMIT_TAG" \
+          --data-urlencode "description=$PACKAGE_NAME $VERSION" \
+          "$RELEASE_URL"
+      fi
+      for RPM in dist/*.rpm; do
+        FILE=$(basename "$RPM")
+        PKG_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE_NAME/$VERSION/$FILE"
+        curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$RPM" "$PKG_URL"
+        curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+          --data-urlencode "name=$FILE" \
+          --data-urlencode "url=$PKG_URL" \
+          --data-urlencode "direct_asset_path=/$FILE" \
+          --data-urlencode "link_type=package" \
+          "$RELEASE_URL/$CI_COMMIT_TAG/assets/links"
+      done
