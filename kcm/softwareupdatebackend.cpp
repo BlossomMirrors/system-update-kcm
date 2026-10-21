@@ -848,10 +848,7 @@ void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMess
             rebootSystem();
         break;
     case TxnKind::Check:
-        if (success)
-            fetchDeployments();
-        else
-            setChecking(false);
+        fetchDeployments();
         break;
     case TxnKind::Upgrade:
         if (success)
