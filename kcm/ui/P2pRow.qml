@@ -44,6 +44,6 @@ ColumnLayout {
         wrapMode: Text.WordWrap
         opacity: 0.7
         font: Kirigami.Theme.smallFont
-        text: i18n("Other computers found: %1", root.p2p.peerCount) + "  ·  " + i18n("Storage used: %1", root.p2p.storeSize)
+        text: i18n("Other computers found: %1", root.p2p.peerCount) + " • " + i18n("Storage used: %1", root.p2p.storeSize)
     }
 }
