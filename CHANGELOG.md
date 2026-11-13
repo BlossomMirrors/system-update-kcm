@@ -1,4 +1,4 @@
-# 0.3.1
+# 0.4.0
 
 - Run upgrades in a D-Bus activated helper so downloading and staging continue in the background with a working Plasma job notification and cancel button after System Settings is closed
 - Reattach to a running upgrade, including its transaction log, when the module is reopened
