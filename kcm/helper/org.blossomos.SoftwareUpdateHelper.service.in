@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.blossomos.SoftwareUpdateHelper
+Exec=@KDE_INSTALL_FULL_LIBEXECDIR@/kcm_software_update_helper

@@ -11,3 +11,6 @@ build-*/
 
 # RPM packaging working tree
 rpmbuild/
+
+# clangd compilation database (symlink into build/)
+compile_commands.json

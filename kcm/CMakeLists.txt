@@ -4,6 +4,8 @@ kcoreaddons_add_plugin(kcm_software_update
         kcm_software_update.cpp
         softwareupdatebackend.cpp
         p2pbackend.cpp
+        rpmostreetransaction.h
+        updatehelperdbus.h
 )
 
 qt_policy(SET QTP0001 NEW)
@@ -64,6 +66,29 @@ qt_add_resources(kcm_software_update "qml_kcm_path"
 
 target_compile_definitions(kcm_software_update
     PRIVATE TRANSLATION_DOMAIN="kcm_software_update")
+
+# Owns upgrade transactions so they outlive the System Settings window
+add_executable(kcm_software_update_helper
+    helper/main.cpp
+    helper/updatehelper.cpp
+    helper/updatehelper.h
+    rpmostreetransaction.h
+    updatehelperdbus.h
+)
+target_compile_definitions(kcm_software_update_helper
+    PRIVATE TRANSLATION_DOMAIN="kcm_software_update")
+target_link_libraries(kcm_software_update_helper
+    PRIVATE
+        Qt6::Core
+        Qt6::DBus
+        KF6::I18n
+)
+install(TARGETS kcm_software_update_helper DESTINATION ${KDE_INSTALL_LIBEXECDIR})
+
+configure_file(helper/org.blossomos.SoftwareUpdateHelper.service.in
+    ${CMAKE_CURRENT_BINARY_DIR}/org.blossomos.SoftwareUpdateHelper.service @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.blossomos.SoftwareUpdateHelper.service
+    DESTINATION ${KDE_INSTALL_DBUSSERVICEDIR})
 
 target_link_libraries(kcm_software_update
     PRIVATE

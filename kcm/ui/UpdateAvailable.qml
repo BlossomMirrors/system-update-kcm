@@ -48,11 +48,13 @@ ColumnLayout {
                         font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.1)
                     }
                     QQC2.Label {
-                        text: i18n("Version %1", backend.pendingVersion)
+                        text: backend.updateStaged
+                            ? i18n("Version %1 • Restart required", backend.pendingVersion)
+                            : i18n("Version %1", backend.pendingVersion)
                         opacity: 0.7
                     }
                     QQC2.Label {
-                        visible: backend.downloadSize !== ""
+                        visible: !backend.updateStaged && backend.downloadSize !== ""
                         text: i18n("Approximate download size: %1", backend.downloadSize)
                         opacity: 0.7
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -61,10 +63,20 @@ ColumnLayout {
 
                 Item { Layout.fillWidth: true }
 
+                // A staged deployment only needs a reboot, never a second install
                 QQC2.Button {
+                    visible: !backend.updateStaged
                     text: i18n("Update now")
                     highlighted: true
                     onClicked: backend.startUpgrade()
+                }
+
+                QQC2.Button {
+                    visible: backend.updateStaged
+                    icon.name: "system-reboot"
+                    text: i18n("Restart now")
+                    highlighted: true
+                    onClicked: backend.requestReboot()
                 }
             }
 
@@ -76,7 +88,9 @@ ColumnLayout {
 
             QQC2.Label {
                 Layout.fillWidth: true
-                text: i18n("This update contains security updates, bug fixes and updated packages for %1. After downloading, the update will be applied on the next restart.", backend.osName)
+                text: backend.updateStaged
+                    ? i18n("This update has been downloaded and installed. It will be applied on the next restart.")
+                    : i18n("This update contains security updates, bug fixes and updated packages for %1. After downloading, the update will be applied on the next restart.", backend.osName)
                 wrapMode: Text.WordWrap
                 opacity: 0.85
             }

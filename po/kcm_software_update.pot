@@ -161,3 +161,71 @@ msgstr ""
 
 msgid "Storage used: %1"
 msgstr ""
+
+msgid "Current"
+msgstr ""
+
+msgid "After restart"
+msgstr ""
+
+msgid "On"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
+msgid "%1 %2 • Restart required"
+msgstr ""
+
+msgid "%1 %2 is being downloaded"
+msgstr ""
+
+msgid "After the restart the system will run version %1."
+msgstr ""
+
+msgid "%1 %2 will be downloaded tonight."
+msgstr ""
+
+msgid "Installed"
+msgstr ""
+
+msgid "The system will then restart with %1 %2."
+msgstr ""
+
+msgid "Your files and settings stay unchanged. You can always update to the latest version again afterwards."
+msgstr ""
+
+msgid "Cancelling…"
+msgstr ""
+
+msgid "%1 %2 is being installed"
+msgstr ""
+
+msgid "Installing %1"
+msgstr ""
+
+msgid "You can close System Settings. The update continues in the background and the restart is up to you."
+msgstr ""
+
+msgid "Version %1 • Restart required"
+msgstr ""
+
+msgid "This update has been downloaded and installed. It will be applied on the next restart."
+msgstr ""
+
+msgid "Less than a minute remaining"
+msgstr ""
+
+msgid "About 1 minute remaining"
+msgid_plural "About %1 minutes remaining"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "About %1 remaining"
+msgstr ""
+
+msgid "The update service stopped unexpectedly"
+msgstr ""
+
+msgid "The update was cancelled"
+msgstr ""

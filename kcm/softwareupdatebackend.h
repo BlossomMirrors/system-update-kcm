@@ -1,36 +1,13 @@
 #pragma once
-#include <QDBusAbstractInterface>
 #include <QDBusConnection>
-#include <QDBusPendingReply>
-#include <QElapsedTimer>
 #include <QObject>
 #include <QString>
 #include <QStringList>
 #include <QVariantMap>
 #include <qqmlintegration.h>
 
-// Proxy for the rpm-ostree transaction peer connection
-class RpmOstreeTransaction : public QDBusAbstractInterface
-{
-    Q_OBJECT
-public:
-    explicit RpmOstreeTransaction(const QDBusConnection &conn, QObject *parent = nullptr)
-        : QDBusAbstractInterface(QString(),
-                                 QStringLiteral("/"),
-                                 "org.projectatomic.rpmostree1.Transaction",
-                                 conn, parent)
-    {}
-
-    inline QDBusPendingReply<> start()  { return asyncCall(QStringLiteral("Start"));  }
-    inline QDBusPendingReply<> cancel() { return asyncCall(QStringLiteral("Cancel")); }
-
-Q_SIGNALS:
-    void Message(const QString &message);
-    void TaskBegin(const QString &text);
-    void TaskEnd(const QString &text);
-    void PercentProgress(const QString &text, quint32 percent);
-    void Finished(bool success, const QString &errorMessage);
-};
+class RpmOstreeTransaction;
+class QDBusServiceWatcher;
 
 class SoftwareUpdateBackend : public QObject
 {
@@ -44,10 +21,15 @@ class SoftwareUpdateBackend : public QObject
     Q_PROPERTY(int     progressPercent READ progressPercent NOTIFY progressPercentChanged)
     Q_PROPERTY(bool    hasPercent      READ hasPercent      NOTIFY hasPercentChanged)
     Q_PROPERTY(QString progressMessage READ progressMessage NOTIFY progressMessageChanged)
+    Q_PROPERTY(QStringList progressLog READ progressLog     NOTIFY progressLogReset)
     Q_PROPERTY(QString downloadSize    READ downloadSize    NOTIFY downloadSizeChanged)
     Q_PROPERTY(QString downloadedSize  READ downloadedSize  NOTIFY downloadedSizeChanged)
+    Q_PROPERTY(QString timeRemaining   READ timeRemaining   NOTIFY timeRemainingChanged)
+    Q_PROPERTY(bool    applying        READ applying        NOTIFY applyingChanged)
+    Q_PROPERTY(bool    cancelling      READ cancelling      NOTIFY cancellingChanged)
     Q_PROPERTY(bool autoUpdateEnabled  READ autoUpdateEnabled NOTIFY autoUpdateEnabledChanged)
     Q_PROPERTY(bool updateAvailable    READ updateAvailable   NOTIFY updateAvailableChanged)
+    Q_PROPERTY(bool updateStaged       READ updateStaged      NOTIFY updateStagedChanged)
     Q_PROPERTY(bool busy               READ busy              NOTIFY busyChanged)
     Q_PROPERTY(bool checking           READ checking          NOTIFY checkingChanged)
     Q_PROPERTY(bool resetting          READ resetting         NOTIFY resettingChanged)
@@ -66,10 +48,15 @@ public:
     int     progressPercent() const { return m_progressPercent; }
     bool    hasPercent()      const { return m_hasPercent; }
     QString progressMessage() const { return m_progressMessage; }
+    QStringList progressLog() const { return m_progressLog; }
     QString downloadSize()    const { return m_downloadSize; }
     QString downloadedSize()  const { return m_downloadedSize; }
+    QString timeRemaining()   const { return m_timeRemaining; }
+    bool applying()           const { return m_applying; }
+    bool cancelling()         const { return m_cancelling; }
     bool autoUpdateEnabled()  const { return m_autoUpdateEnabled; }
     bool updateAvailable()    const { return m_updateAvailable; }
+    bool updateStaged()       const { return m_updateStaged; }
     bool busy()               const { return m_busy; }
     bool checking()           const { return m_checking; }
     bool resetting()          const { return m_resetting; }
@@ -82,6 +69,7 @@ public:
     Q_INVOKABLE void setAutoUpdate(bool enabled);
     Q_INVOKABLE void checkForUpdates();
     Q_INVOKABLE void rebootSystem();
+    Q_INVOKABLE void requestReboot();
     Q_INVOKABLE void startReset();
 
 public Q_SLOTS:
@@ -99,10 +87,16 @@ Q_SIGNALS:
     void progressPercentChanged();
     void hasPercentChanged();
     void progressMessageChanged();
+    void progressLogReset();
+    void progressLogAppended(const QString &line);
     void downloadSizeChanged();
     void downloadedSizeChanged();
+    void timeRemainingChanged();
+    void applyingChanged();
+    void cancellingChanged();
     void autoUpdateEnabledChanged();
     void updateAvailableChanged();
+    void updateStagedChanged();
     void busyChanged();
     void checkingChanged();
     void resettingChanged();
@@ -115,9 +109,11 @@ private Q_SLOTS:
     void onTxnTaskEnd(const QString &text);
     void onTxnProgress(const QString &text, quint32 percent);
     void onTxnFinished(bool success, const QString &errorMessage);
+    void onHelperStateChanged(const QVariantMap &state);
+    void onHelperFinished(bool success, bool cancelled, const QString &errorMessage);
 
 private:
-    enum class TxnKind { Upgrade, Rollback, Reset, Check };
+    enum class TxnKind { Rollback, Reset, Check };
 
     void setOsName(const QString &v);
     void fetchRemoteOsName();
@@ -127,14 +123,15 @@ private:
     void setProgressPercent(int v);
     void setHasPercent(bool v);
     void setProgressMessage(const QString &v);
+    void resetProgress();
     void setDownloadSize(const QString &v);
     void setDownloadedSize(const QString &v);
-    void startDiskProgress();
-    void stopDiskProgress();
-    void updateDownloadProgress();
-    void finishDownloadPhase();
+    void setTimeRemaining(const QString &v);
+    void setApplying(bool v);
+    void setCancelling(bool v);
     void setAutoUpdateEnabled(bool v);
     void setUpdateAvailable(bool v);
+    void setUpdateStaged(bool v);
     void setBusy(bool v);
     void setChecking(bool v);
     void setResetting(bool v);
@@ -142,6 +139,10 @@ private:
     void setChangelogEntries(const QStringList &v);
     void fetchChangelog();
 
+    void runCheck();
+    void attachToHelper(const QVariantMap &state);
+    void applyHelperState(const QVariantMap &state);
+    void endHelperUpgrade();
     void fetchDeployments();
     void fetchCachedUpdate();
     void readAutoUpdateState();
@@ -158,26 +159,27 @@ private:
     int     m_progressPercent  = 0;
     bool    m_hasPercent       = false;
     QString m_progressMessage;
+    QStringList m_progressLog;
     QString m_downloadSize;
     QString m_downloadedSize;
+    QString m_timeRemaining;
     quint64 m_downloadBytes    = 0;
-    quint64 m_pullTotalBytes   = 0;
-    quint64 m_pullCompletedBytes = 0;
-    quint64 m_taskBytes        = 0;
-    quint64 m_taskBaseline     = 0;
-    bool    m_taskActive       = false;
-    quint64 m_lastProcessedBytes = 0;
-    QElapsedTimer m_speedTimer;
-    class QTimer *m_diskTimer  = nullptr;
+    bool    m_applying         = false;
+    bool    m_cancelling       = false;
     bool    m_autoUpdateEnabled = false;
     bool    m_updateAvailable   = false;
+    bool    m_updateStaged      = false;
     bool    m_busy              = false;
     bool    m_checking          = false;
     bool    m_resetting         = false;
     QStringList m_layeredPackages;
     QStringList m_changelogEntries;
     class QNetworkAccessManager *m_netManager = nullptr;
-    TxnKind m_txnKind           = TxnKind::Upgrade;
+    TxnKind m_txnKind           = TxnKind::Check;
+
+    // True while the KCM mirrors an upgrade owned by the update helper
+    bool                 m_helperUpgrade = false;
+    QDBusServiceWatcher *m_helperWatcher = nullptr;
 
     QString              m_bootedChecksum;
     QString              m_txnConnectionName;

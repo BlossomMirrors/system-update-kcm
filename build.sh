@@ -70,6 +70,8 @@ DESTDIR=%{buildroot} ninja -C build install
 %files -f kcm_software_update.lang
 %{_libdir}/qt6/plugins/plasma/kcms/systemsettings/kcm_software_update.so
 %{_datadir}/kservices6/kcm_software_update.json
+%{_libdir}/libexec/kcm_software_update_helper
+%{_datadir}/dbus-1/services/org.blossomos.SoftwareUpdateHelper.service
 
 %changelog
 * $(LANG=C date +"%a %b %d %Y") Leonie Ain <me@koyu.space> - $VERSION-$RELEASE

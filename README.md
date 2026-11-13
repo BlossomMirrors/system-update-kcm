@@ -5,7 +5,11 @@ KDE System Settings module (KCM) for managing OS image updates on immutable Linu
 ## Features
 
 - View the currently booted version and any pending or previous deployments
-- Download and stage an OS update in the background with live progress
+- Download and stage an OS update in the background with live progress and a
+  remaining time estimate; the upgrade runs in a small D-Bus activated helper
+  (`kcm_software_update_helper`) so it and its Plasma job notification, including
+  cancelling, keep working after System Settings is closed
+- Offer a restart instead of a second install once an update is staged
 - Roll back to the previous deployment
 - Enable or disable automatic nightly updates via the `rpm-ostreed-automatic.timer` systemd unit
 - Kirigami-based UI that integrates natively into KDE System Settings

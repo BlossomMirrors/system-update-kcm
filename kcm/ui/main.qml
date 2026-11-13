@@ -20,7 +20,8 @@ KCMUtils.SimpleKCM {
         function onUpgradeFinished(success) {
             if (success) {
                 mainLoader.state = "done"
-            } else {
+            } else if (mainLoader.state !== "error") {
+                // errorOccurred usually arrived first with the real reason
                 root.errorMsg = root.backend.progressMessage
                 mainLoader.state = "error"
             }

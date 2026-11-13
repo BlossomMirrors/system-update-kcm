@@ -92,8 +92,8 @@ msgstr "Das System startet dann mit %1 %2 neu."
 msgid "After the restart the system will run version %1."
 msgstr "Nach dem Neustart läuft das System mit Version %1."
 
-msgid "%1 %2 — Restart required"
-msgstr "%1 %2 — Neustart erforderlich"
+msgid "%1 %2 • Restart required"
+msgstr "%1 %2 • Neustart erforderlich"
 
 msgid "Current"
 msgstr "Aktuell"
@@ -197,3 +197,38 @@ msgstr "Gefundene Computer: %1"
 
 msgid "Storage used: %1"
 msgstr "Belegter Speicher: %1"
+
+msgid "Cancelling…"
+msgstr "Wird abgebrochen…"
+
+msgid "%1 %2 is being installed"
+msgstr "%1 %2 wird installiert"
+
+msgid "Installing %1"
+msgstr "%1 wird installiert"
+
+msgid "You can close System Settings. The update continues in the background and the restart is up to you."
+msgstr "Du kannst die Systemeinstellungen schließen. Die Aktualisierung läuft im Hintergrund weiter und wann neu gestartet wird, entscheidest du."
+
+msgid "Version %1 • Restart required"
+msgstr "Version %1 • Neustart erforderlich"
+
+msgid "This update has been downloaded and installed. It will be applied on the next restart."
+msgstr "Diese Aktualisierung wurde heruntergeladen und installiert. Sie wird beim nächsten Neustart angewendet."
+
+msgid "Less than a minute remaining"
+msgstr "Weniger als eine Minute verbleibend"
+
+msgid "About 1 minute remaining"
+msgid_plural "About %1 minutes remaining"
+msgstr[0] "Etwa 1 Minute verbleibend"
+msgstr[1] "Etwa %1 Minuten verbleibend"
+
+msgid "About %1 remaining"
+msgstr "Etwa %1 verbleibend"
+
+msgid "The update service stopped unexpectedly"
+msgstr "Der Aktualisierungsdienst wurde unerwartet beendet"
+
+msgid "The update was cancelled"
+msgstr "Die Aktualisierung wurde abgebrochen"

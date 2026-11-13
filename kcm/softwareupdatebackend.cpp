@@ -1,4 +1,6 @@
 #include "softwareupdatebackend.h"
+#include "rpmostreetransaction.h"
+#include "updatehelperdbus.h"
 
 #include <QDBusArgument>
 #include <QDBusConnection>
@@ -6,8 +8,8 @@
 #include <QDBusPendingCall>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
+#include <QDBusServiceWatcher>
 #include <QDBusVariant>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -16,10 +18,10 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
-#include <QRegularExpression>
 #include <QTextStream>
 #include <QTimer>
 
+#include <KFormat>
 #include <KLocalizedString>
 
 static constexpr auto RPMOSTREE_SERVICE       = "org.projectatomic.rpmostree1";
@@ -65,19 +67,43 @@ static QString readOsName()
     return name.isEmpty() ? QStringLiteral("Linux") : name;
 }
 
-// The identity repo's os-release always tracks whatever release is next,
-// so its PRETTY_NAME is the name of the pending update regardless of which
-// image origin produced it
+/*  The identity repo's os-release always tracks whatever release is next,
+ *  so its PRETTY_NAME is the name of the pending update regardless of which
+ *  image origin produced it
+*/
 static constexpr auto IDENTITY_OS_RELEASE_URL =
     "https://dev.blossomos.org/blossom/os/core/patches/identity/-/raw/main/os-release";
 
 SoftwareUpdateBackend::SoftwareUpdateBackend(QObject *parent)
     : QObject(parent)
     , m_osName(readOsName())
-{}
+{
+    /*  Upgrades run in the update helper so they survive closing the window;
+     *  listen to it regardless of who started the upgrade
+    */
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    bus.connect(QLatin1String(HELPER_SERVICE), QLatin1String(HELPER_PATH),
+                QLatin1String(HELPER_IFACE), QStringLiteral("StateChanged"),
+                this, SLOT(onHelperStateChanged(QVariantMap)));
+    bus.connect(QLatin1String(HELPER_SERVICE), QLatin1String(HELPER_PATH),
+                QLatin1String(HELPER_IFACE), QStringLiteral("Finished"),
+                this, SLOT(onHelperFinished(bool,bool,QString)));
 
-// The locally installed system's own name, independent of osName which may
-// be showing a pending update's remote branding instead
+    m_helperWatcher = new QDBusServiceWatcher(
+        QLatin1String(HELPER_SERVICE), bus,
+        QDBusServiceWatcher::WatchForUnregistration, this);
+    connect(m_helperWatcher, &QDBusServiceWatcher::serviceUnregistered, this, [this] {
+        // The helper crashed or was killed without reporting a result
+        if (!m_helperUpgrade)
+            return;
+        endHelperUpgrade();
+        checkForUpdates();
+    });
+}
+
+/*  The locally installed system's own name, independent of osName which may
+ *  be showing a pending update's remote branding instead
+*/
 QString SoftwareUpdateBackend::installedOsName() const
 {
     return readOsName();
@@ -107,6 +133,30 @@ void SoftwareUpdateBackend::checkForUpdates()
     setChecking(true);
     readAutoUpdateState();
 
+    /*  An upgrade may still be running from an earlier session of this
+     *  window; ask without starting the helper just for the question
+    */
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QLatin1String(HELPER_SERVICE), QLatin1String(HELPER_PATH),
+        QLatin1String(HELPER_IFACE), QStringLiteral("GetState"));
+    msg.setAutoStartService(false);
+    auto *w = new QDBusPendingCallWatcher(
+        QDBusConnection::sessionBus().asyncCall(msg), this);
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
+        watcher->deleteLater();
+        QDBusPendingReply<QVariantMap> reply = *watcher;
+        if (!reply.isError() && reply.value().value(QStringLiteral("running")).toBool()) {
+            setChecking(false);
+            attachToHelper(reply.value());
+            return;
+        }
+        runCheck();
+    });
+}
+
+void SoftwareUpdateBackend::runCheck()
+{
+
     const QVariantMap options{{QStringLiteral("mode"), QStringLiteral("check")}};
     auto *w = new QDBusPendingCallWatcher(
         authCall(RPMOSTREE_SERVICE, RPMOSTREE_OS_PATH, RPMOSTREE_OS_IFACE,
@@ -128,25 +178,26 @@ void SoftwareUpdateBackend::checkForUpdates()
 void SoftwareUpdateBackend::startUpgrade()
 {
     if (m_busy) return;
+    m_helperUpgrade = true;
     setBusy(true);
-    setProgressPercent(0);
-    setHasPercent(false);
-    setProgressMessage(QString());
+    resetProgress();
+
+    // The helper is D-Bus activated and keeps going once this window closes
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QLatin1String(HELPER_SERVICE), QLatin1String(HELPER_PATH),
+        QLatin1String(HELPER_IFACE), QStringLiteral("Upgrade"));
+    msg.setArguments({m_osName, m_pendingVersion,
+                      QVariant::fromValue<qulonglong>(m_downloadBytes)});
 
     auto *w = new QDBusPendingCallWatcher(
-        authCall(RPMOSTREE_SERVICE, RPMOSTREE_OS_PATH, RPMOSTREE_OS_IFACE,
-                 QStringLiteral("Upgrade"), {QVariant::fromValue(QVariantMap{})}), this);
-
+        QDBusConnection::sessionBus().asyncCall(msg), this);
     connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
         watcher->deleteLater();
-        QDBusPendingReply<QString> reply = *watcher;
-        if (reply.isError()) {
-            Q_EMIT errorOccurred(reply.error().message());
-            setBusy(false);
-            Q_EMIT upgradeFinished(false);
+        if (!watcher->isError() || !m_helperUpgrade)
             return;
-        }
-        beginTransaction(reply.value(), TxnKind::Upgrade);
+        endHelperUpgrade();
+        Q_EMIT errorOccurred(watcher->error().message());
+        Q_EMIT upgradeFinished(false);
     });
 }
 
@@ -154,9 +205,7 @@ void SoftwareUpdateBackend::startRollback()
 {
     if (m_busy) return;
     setBusy(true);
-    setProgressPercent(0);
-    setHasPercent(false);
-    setProgressMessage(QString());
+    resetProgress();
 
     auto *w = new QDBusPendingCallWatcher(
         authCall(RPMOSTREE_SERVICE, RPMOSTREE_OS_PATH, RPMOSTREE_OS_IFACE,
@@ -180,9 +229,7 @@ void SoftwareUpdateBackend::startReset()
     if (m_busy) return;
     setBusy(true);
     setResetting(true);
-    setProgressPercent(0);
-    setHasPercent(false);
-    setProgressMessage(QString());
+    resetProgress();
 
     // Same options the rpm-ostree reset CLI passes to UpdateDeployment
     const QVariantMap options{
@@ -218,6 +265,16 @@ void SoftwareUpdateBackend::scheduleUpgrade()
 
 void SoftwareUpdateBackend::cancelUpgrade()
 {
+    if (m_helperUpgrade) {
+        // The helper reports back through Finished once the daemon stopped
+        setCancelling(true);
+        QDBusMessage msg = QDBusMessage::createMethodCall(
+            QLatin1String(HELPER_SERVICE), QLatin1String(HELPER_PATH),
+            QLatin1String(HELPER_IFACE), QStringLiteral("Cancel"));
+        msg.setAutoStartService(false);
+        QDBusConnection::sessionBus().asyncCall(msg);
+        return;
+    }
     if (m_txnIface)
         m_txnIface->cancel();
     closeJobView(QString());
@@ -308,6 +365,24 @@ void SoftwareUpdateBackend::rebootSystem()
     });
 }
 
+/*  Shows Plasma's shutdown screen with restart preselected, so the user can
+ *  still cancel and open apps get a chance to save their state
+*/
+void SoftwareUpdateBackend::requestReboot()
+{
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QStringLiteral("org.kde.LogoutPrompt"), QStringLiteral("/LogoutPrompt"),
+        QStringLiteral("org.kde.LogoutPrompt"), QStringLiteral("promptReboot"));
+    auto *w = new QDBusPendingCallWatcher(
+        QDBusConnection::sessionBus().asyncCall(msg), this);
+    connect(w, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watcher) {
+        watcher->deleteLater();
+        // Outside a Plasma session there is no prompt to show
+        if (watcher->isError())
+            rebootSystem();
+    });
+}
+
 void SoftwareUpdateBackend::fetchDeployments()
 {
     // Deployments is a property on the Sysroot object, not a method on the OS object.
@@ -379,7 +454,7 @@ void SoftwareUpdateBackend::fetchDeployments()
         };
 
         QString current, pending, previous;
-        QString bootedDigest, pendingDigest;
+        QString bootedDigest, pendingDigest, pendingChecksum;
         QStringList layeredBooted, layeredPending;
         bool hasPending = false;
         int bootedIdx = -1;
@@ -406,6 +481,7 @@ void SoftwareUpdateBackend::fetchDeployments()
             if ((staged || beforeBooted) && pending.isEmpty()) {
                 pending = version;
                 pendingDigest = imageDigest(dep);
+                pendingChecksum = dep.value(QStringLiteral("checksum")).toString();
                 layeredPending = layeredOf(dep);
                 hasPending = true;
             } else if (!staged && !beforeBooted && previous.isEmpty()) {
@@ -413,13 +489,18 @@ void SoftwareUpdateBackend::fetchDeployments()
             }
         }
 
-        const bool depUpdateAvailable = hasPending && pendingDigest != bootedDigest;
+        // Plain ostree commits carry no image digest, so compare checksums
+        const bool depUpdateAvailable = hasPending
+            && (pendingDigest != bootedDigest
+                || (pendingDigest.isEmpty() && pendingChecksum != m_bootedChecksum));
         setCurrentVersion(current);
         setPendingVersion(pending);
         setPreviousVersion(previous);
         // The pending deployment reflects what the next boot and future updates use
         setLayeredPackages(hasPending ? layeredPending : layeredBooted);
         setUpdateAvailable(depUpdateAvailable);
+        // Already deployed for the next boot, so only a restart is left
+        setUpdateStaged(depUpdateAvailable);
         if (depUpdateAvailable)
             fetchRemoteOsName();
         fetchCachedUpdate();
@@ -441,8 +522,9 @@ void SoftwareUpdateBackend::fetchCachedUpdate()
     connect(w, &QDBusPendingCallWatcher::finished, this, [this, iface](QDBusPendingCallWatcher *watcher) {
         iface->deleteLater();
         watcher->deleteLater();
-        // The deployment list already resolved a stronger signal; do not
-        // reissue the remote name lookup or fall back to the local name
+        /*  The deployment list already resolved a stronger signal; do not
+         *  reissue the remote name lookup or fall back to the local name
+        */
         const bool alreadyAvailable = m_updateAvailable;
         QDBusPendingReply<QDBusVariant> reply = *watcher;
         if (!reply.isError()) {
@@ -451,8 +533,9 @@ void SoftwareUpdateBackend::fetchCachedUpdate()
             if (v.canConvert<QDBusArgument>())
                 qvariant_cast<QDBusArgument>(v) >> update;
 
-            // Container images keep the same version label across builds,
-            // so a new commit only shows up as a checksum or layer change
+            /*  Container images keep the same version label across builds,
+             *  so a new commit only shows up as a checksum or layer change
+            */
             const QString checksum = update.value(QStringLiteral("checksum")).toString();
             quint64 changedLayers = 0;
             quint64 addedSize = 0;
@@ -528,8 +611,7 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
         setBusy(false);
         setResetting(false);
         setChecking(false);
-        if (kind == TxnKind::Rollback)     Q_EMIT rollbackFinished(false);
-        else if (kind == TxnKind::Upgrade) Q_EMIT upgradeFinished(false);
+        if (kind == TxnKind::Rollback) Q_EMIT rollbackFinished(false);
         return;
     }
     m_txnConnectionName = QLatin1String(TXN_CONN_NAME);
@@ -537,7 +619,6 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
     m_txnIface = new RpmOstreeTransaction(conn, this);
     connect(m_txnIface, &RpmOstreeTransaction::Message,
             this, &SoftwareUpdateBackend::onTxnMessage);
-    // Container layer downloads only report activity via task texts
     connect(m_txnIface, &RpmOstreeTransaction::TaskBegin,
             this, &SoftwareUpdateBackend::onTxnTaskBegin);
     connect(m_txnIface, &RpmOstreeTransaction::TaskEnd,
@@ -550,123 +631,6 @@ void SoftwareUpdateBackend::beginTransaction(const QString &address, TxnKind kin
     m_txnIface->start();
     if (kind != TxnKind::Check)
         openJobView(kind);
-    if (kind == TxnKind::Upgrade)
-        startDiskProgress();
-}
-
-// Extract the last parenthesized human readable size from a daemon message
-static quint64 parseSizeSuffix(const QString &text)
-{
-    static const QRegularExpression re(QStringLiteral(
-        "\\(([0-9]+(?:[.,][0-9]+)?)[\\s\\x{00a0}]*(B|kB|KB|KiB|MB|MiB|GB|GiB|TB|TiB)\\)"));
-    QRegularExpressionMatch last;
-    auto it = re.globalMatch(text);
-    while (it.hasNext())
-        last = it.next();
-    if (!last.hasMatch())
-        return 0;
-    QString num = last.captured(1);
-    num.replace(QLatin1Char(','), QLatin1Char('.'));
-    const QString unit = last.captured(2);
-    double mult = 1;
-    if (unit == QLatin1String("kB") || unit == QLatin1String("KB")) mult = 1e3;
-    else if (unit == QLatin1String("KiB")) mult = 1024.0;
-    else if (unit == QLatin1String("MB"))  mult = 1e6;
-    else if (unit == QLatin1String("MiB")) mult = 1024.0 * 1024;
-    else if (unit == QLatin1String("GB"))  mult = 1e9;
-    else if (unit == QLatin1String("GiB")) mult = 1024.0 * 1024 * 1024;
-    else if (unit == QLatin1String("TB"))  mult = 1e12;
-    else if (unit == QLatin1String("TiB")) mult = 1024.0 * 1024 * 1024 * 1024;
-    return static_cast<quint64>(num.toDouble() * mult);
-}
-
-// Total received bytes over all physical network interfaces
-static quint64 totalRxBytes()
-{
-    QFile f(QStringLiteral("/proc/net/dev"));
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
-        return 0;
-    QTextStream in(&f);
-    in.readLine();
-    in.readLine();
-    quint64 total = 0;
-    while (!in.atEnd()) {
-        const QString line = in.readLine().trimmed();
-        const int colon = line.indexOf(QLatin1Char(':'));
-        if (colon <= 0)
-            continue;
-        if (line.left(colon).trimmed() == QLatin1String("lo"))
-            continue;
-        const QStringList fields =
-            line.mid(colon + 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
-        if (!fields.isEmpty())
-            total += fields.at(0).toULongLong();
-    }
-    return total;
-}
-
-// rpm-ostree reports no byte progress while pulling container layers.
-// The daemon announces exact task sizes though, so completed tasks are
-// counted precisely and only the running task is interpolated from
-// network receive counters, clamped to that task's size.
-void SoftwareUpdateBackend::startDiskProgress()
-{
-    m_pullTotalBytes = 0;
-    m_pullCompletedBytes = 0;
-    m_taskActive = false;
-    m_lastProcessedBytes = 0;
-    m_speedTimer.start();
-
-    if (!m_diskTimer) {
-        m_diskTimer = new QTimer(this);
-        m_diskTimer->setInterval(1000);
-        connect(m_diskTimer, &QTimer::timeout,
-                this, &SoftwareUpdateBackend::updateDownloadProgress);
-    }
-    m_diskTimer->start();
-}
-
-void SoftwareUpdateBackend::updateDownloadProgress()
-{
-    const quint64 total = m_pullTotalBytes > 0 ? m_pullTotalBytes : m_downloadBytes;
-    if (total == 0)
-        return;
-
-    quint64 current = m_pullCompletedBytes;
-    if (m_taskActive) {
-        const quint64 rx = totalRxBytes();
-        const quint64 delta = rx > m_taskBaseline ? rx - m_taskBaseline : 0;
-        current += qMin(delta, m_taskBytes);
-    }
-    current = qMin(current, total);
-    if (current == 0)
-        return;
-
-    const qint64 elapsedMs = m_speedTimer.restart();
-    const quint64 bytesDelta =
-        current > m_lastProcessedBytes ? current - m_lastProcessedBytes : 0;
-    m_lastProcessedBytes = current;
-    if (elapsedMs > 0)
-        jobViewCall(QStringLiteral("setSpeed"),
-                    {QVariant::fromValue(bytesDelta * 1000 / static_cast<quint64>(elapsedMs))});
-
-    const int pct = static_cast<int>(qMin<quint64>(99, current * 100 / total));
-    setHasPercent(true);
-    setDownloadedSize(QLocale().formattedDataSize(static_cast<qint64>(current)));
-    jobViewCall(QStringLiteral("setProcessedAmount"),
-                {QVariant::fromValue(current), QStringLiteral("bytes")});
-    if (pct > m_progressPercent) {
-        setProgressPercent(pct);
-        jobViewCall(QStringLiteral("setPercent"),
-                    {QVariant::fromValue(static_cast<quint32>(pct))});
-    }
-}
-
-void SoftwareUpdateBackend::stopDiskProgress()
-{
-    if (m_diskTimer)
-        m_diskTimer->stop();
-    setDownloadedSize(QString());
 }
 
 void SoftwareUpdateBackend::openJobView(TxnKind kind)
@@ -677,7 +641,6 @@ void SoftwareUpdateBackend::openJobView(TxnKind kind)
     switch (kind) {
     case TxnKind::Rollback: title = i18n("Rolling back %1", m_osName); break;
     case TxnKind::Reset:    title = i18n("Removing layered packages"); break;
-    case TxnKind::Upgrade:  title = i18n("Downloading %1", m_osName); break;
     case TxnKind::Check:    return;
     }
 
@@ -706,9 +669,6 @@ void SoftwareUpdateBackend::openJobView(TxnKind kind)
         }
         m_jobViewPath = path;
         jobViewCall(QStringLiteral("setInfoMessage"), {title});
-        if (m_downloadBytes > 0)
-            jobViewCall(QStringLiteral("setTotalAmount"),
-                        {QVariant::fromValue(m_downloadBytes), QStringLiteral("bytes")});
         if (m_progressPercent > 0)
             jobViewCall(QStringLiteral("setPercent"),
                         {QVariant::fromValue(static_cast<quint32>(m_progressPercent))});
@@ -742,7 +702,6 @@ void SoftwareUpdateBackend::jobViewCall(const QString &method, const QVariantLis
 
 void SoftwareUpdateBackend::cleanupTransaction()
 {
-    stopDiskProgress();
     delete m_txnIface;
     m_txnIface = nullptr;
 
@@ -757,69 +716,22 @@ void SoftwareUpdateBackend::onTxnMessage(const QString &msg)
     setProgressMessage(msg);
     jobViewCall(QStringLiteral("setDescriptionField"),
                 {QVariant::fromValue(0u), QString(), msg});
-
-    // The daemon announces the exact remaining download at pull start
-    if (msg.contains(QLatin1String("needed:"))) {
-        const quint64 bytes = parseSizeSuffix(msg);
-        if (bytes > 0) {
-            m_pullTotalBytes += bytes;
-            m_downloadBytes = m_pullTotalBytes;
-            setDownloadSize(QLocale().formattedDataSize(
-                static_cast<qint64>(m_pullTotalBytes)));
-            jobViewCall(QStringLiteral("setTotalAmount"),
-                        {QVariant::fromValue(m_pullTotalBytes), QStringLiteral("bytes")});
-        }
-    }
 }
 
 void SoftwareUpdateBackend::onTxnTaskBegin(const QString &text)
 {
-    setProgressMessage(text);
-    jobViewCall(QStringLiteral("setDescriptionField"),
-                {QVariant::fromValue(0u), QString(), text});
-
-    const quint64 bytes = parseSizeSuffix(text);
-    if (bytes > 0) {
-        m_taskBytes = bytes;
-        m_taskBaseline = totalRxBytes();
-        m_taskActive = true;
-    } else if (m_pullCompletedBytes > 0) {
-        // A sizeless task after fetching means staging has begun
-        finishDownloadPhase();
-    }
+    onTxnMessage(text);
 }
 
 void SoftwareUpdateBackend::onTxnTaskEnd(const QString &text)
 {
     Q_UNUSED(text);
-    if (m_taskActive) {
-        m_taskActive = false;
-        m_pullCompletedBytes += m_taskBytes;
-        updateDownloadProgress();
-    }
-    // Parsed sizes are rounded, so treat within two percent as done
-    if (m_pullTotalBytes > 0
-        && m_pullCompletedBytes + m_pullTotalBytes / 50 >= m_pullTotalBytes)
-        finishDownloadPhase();
-}
-
-// Staging writes cannot be measured, so fall back to an indeterminate bar
-void SoftwareUpdateBackend::finishDownloadPhase()
-{
-    if (!m_diskTimer || !m_diskTimer->isActive())
-        return;
-    stopDiskProgress();
-    setHasPercent(false);
-    setProgressPercent(0);
 }
 
 void SoftwareUpdateBackend::onTxnProgress(const QString &text, quint32 percent)
 {
     if (!text.isEmpty())
         setProgressMessage(text);
-    // Disk based download progress wins over the jumpy per phase percents
-    if (m_diskTimer && m_diskTimer->isActive())
-        return;
     setHasPercent(true);
     setProgressPercent(static_cast<int>(percent));
     jobViewCall(QStringLiteral("setPercent"), {QVariant::fromValue(percent)});
@@ -850,12 +762,101 @@ void SoftwareUpdateBackend::onTxnFinished(bool success, const QString &errorMess
     case TxnKind::Check:
         fetchDeployments();
         break;
-    case TxnKind::Upgrade:
-        if (success)
-            fetchDeployments();
-        Q_EMIT upgradeFinished(success);
-        break;
     }
+}
+
+// Rough, rounded wording so the estimate does not tick every second
+static QString formatTimeRemaining(qint64 seconds)
+{
+    if (seconds < 0)
+        return {};
+    if (seconds < 60)
+        return i18n("Less than a minute remaining");
+    if (seconds < 3600) {
+        const int minutes = static_cast<int>((seconds + 30) / 60);
+        return i18np("About 1 minute remaining", "About %1 minutes remaining", minutes);
+    }
+    const qint64 roundedMs = (seconds + 150) / 300 * 300 * 1000;
+    return i18n("About %1 remaining", KFormat().formatSpelloutDuration(roundedMs));
+}
+
+void SoftwareUpdateBackend::attachToHelper(const QVariantMap &state)
+{
+    m_helperUpgrade = true;
+    setBusy(true);
+    resetProgress();
+    if (!state.value(QStringLiteral("osName")).toString().isEmpty())
+        setOsName(state.value(QStringLiteral("osName")).toString());
+    if (!state.value(QStringLiteral("version")).toString().isEmpty())
+        setPendingVersion(state.value(QStringLiteral("version")).toString());
+    m_progressLog = state.value(QStringLiteral("log")).toStringList();
+    Q_EMIT progressLogReset();
+    applyHelperState(state);
+}
+
+void SoftwareUpdateBackend::applyHelperState(const QVariantMap &state)
+{
+    const bool applying = state.value(QStringLiteral("applying")).toBool();
+    setProgressMessage(state.value(QStringLiteral("message")).toString());
+    setApplying(applying);
+    setCancelling(state.value(QStringLiteral("cancelling")).toBool());
+    setHasPercent(state.value(QStringLiteral("hasPercent")).toBool());
+    setProgressPercent(state.value(QStringLiteral("percent")).toInt());
+
+    const quint64 total = state.value(QStringLiteral("total")).toULongLong();
+    const quint64 downloaded = state.value(QStringLiteral("downloaded")).toULongLong();
+    if (total > 0)
+        setDownloadSize(QLocale().formattedDataSize(static_cast<qint64>(total)));
+    setDownloadedSize(!applying && downloaded > 0
+        ? QLocale().formattedDataSize(static_cast<qint64>(downloaded))
+        : QString());
+    setTimeRemaining(formatTimeRemaining(state.value(QStringLiteral("eta")).toLongLong()));
+}
+
+void SoftwareUpdateBackend::onHelperStateChanged(const QVariantMap &state)
+{
+    const bool running = state.value(QStringLiteral("running")).toBool();
+    if (m_helperUpgrade) {
+        if (running)
+            applyHelperState(state);
+        return;
+    }
+    // Check if already running
+    if (running && !m_busy) {
+        setChecking(false);
+        m_helperUpgrade = true;
+        setBusy(true);
+        resetProgress();
+        applyHelperState(state);
+    }
+}
+
+void SoftwareUpdateBackend::onHelperFinished(bool success, bool cancelled,
+                                             const QString &errorMessage)
+{
+    if (!m_helperUpgrade)
+        return;
+    endHelperUpgrade();
+
+    if (cancelled) {
+        fetchDeployments();
+        return;
+    }
+    if (!success)
+        Q_EMIT errorOccurred(errorMessage.isEmpty() ? i18n("Unknown error") : errorMessage);
+    else
+        fetchDeployments();
+    Q_EMIT upgradeFinished(success);
+}
+
+void SoftwareUpdateBackend::endHelperUpgrade()
+{
+    m_helperUpgrade = false;
+    setBusy(false);
+    setApplying(false);
+    setCancelling(false);
+    setDownloadedSize(QString());
+    setTimeRemaining(QString());
 }
 
 void SoftwareUpdateBackend::setOsName(const QString &v)
@@ -865,9 +866,10 @@ void SoftwareUpdateBackend::setOsName(const QString &v)
     Q_EMIT osNameChanged();
 }
 
-// Fetch the identity repo's os-release and use its PRETTY_NAME directly,
-// rather than guessing the future release's branding from the currently
-// installed one
+/*  Fetch the identity repo's os-release and use its PRETTY_NAME directly,
+ *  rather than guessing the future release's branding from the currently
+ *  installed one
+*/
 void SoftwareUpdateBackend::fetchRemoteOsName()
 {
     if (!m_netManager)
@@ -920,6 +922,23 @@ void SoftwareUpdateBackend::setProgressMessage(const QString &v)
     if (m_progressMessage == v) return;
     m_progressMessage = v;
     Q_EMIT progressMessageChanged();
+    if (!v.isEmpty()) {
+        m_progressLog.append(v);
+        Q_EMIT progressLogAppended(v);
+    }
+}
+
+void SoftwareUpdateBackend::resetProgress()
+{
+    setProgressPercent(0);
+    setHasPercent(false);
+    setProgressMessage(QString());
+    setDownloadedSize(QString());
+    setTimeRemaining(QString());
+    setApplying(false);
+    setCancelling(false);
+    m_progressLog.clear();
+    Q_EMIT progressLogReset();
 }
 
 void SoftwareUpdateBackend::setHasPercent(bool v)
@@ -941,6 +960,34 @@ void SoftwareUpdateBackend::setDownloadedSize(const QString &v)
     if (m_downloadedSize == v) return;
     m_downloadedSize = v;
     Q_EMIT downloadedSizeChanged();
+}
+
+void SoftwareUpdateBackend::setTimeRemaining(const QString &v)
+{
+    if (m_timeRemaining == v) return;
+    m_timeRemaining = v;
+    Q_EMIT timeRemainingChanged();
+}
+
+void SoftwareUpdateBackend::setApplying(bool v)
+{
+    if (m_applying == v) return;
+    m_applying = v;
+    Q_EMIT applyingChanged();
+}
+
+void SoftwareUpdateBackend::setCancelling(bool v)
+{
+    if (m_cancelling == v) return;
+    m_cancelling = v;
+    Q_EMIT cancellingChanged();
+}
+
+void SoftwareUpdateBackend::setUpdateStaged(bool v)
+{
+    if (m_updateStaged == v) return;
+    m_updateStaged = v;
+    Q_EMIT updateStagedChanged();
 }
 
 void SoftwareUpdateBackend::setAutoUpdateEnabled(bool v)
@@ -996,8 +1043,9 @@ void SoftwareUpdateBackend::setChangelogEntries(const QStringList &v)
     Q_EMIT changelogEntriesChanged();
 }
 
-// changelog.json maps language codes to a short list of bullet points
-// describing the latest release, e.g. {"en": ["..."], "de": ["..."]}
+/*  changelog.json maps language codes to a short list of bullet points
+ *  describing the latest release, e.g. {"en": ["..."], "de": ["..."]}
+*/
 void SoftwareUpdateBackend::fetchChangelog()
 {
     if (!m_netManager)

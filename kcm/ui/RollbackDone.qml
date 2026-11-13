@@ -65,7 +65,7 @@ ColumnLayout {
         QQC2.Button {
             text: i18n("Restart now")
             highlighted: true
-            onClicked: backend.rebootSystem()
+            onClicked: backend.requestReboot()
         }
     }
 

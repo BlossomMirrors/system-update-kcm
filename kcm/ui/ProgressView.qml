@@ -8,16 +8,19 @@ ColumnLayout {
     required property var backend
     spacing: Kirigami.Units.largeSpacing
 
-    property var logLines: []
+    // Seeded from the backend so reopening mid upgrade shows the full log
+    function reloadLog() {
+        logModel.clear()
+        for (const line of backend.progressLog)
+            logModel.append({ line: line })
+    }
+
+    Component.onCompleted: reloadLog()
 
     Connections {
         target: backend
-        function onProgressMessageChanged() {
-            if (backend.progressMessage !== "") {
-                logLines.push(backend.progressMessage)
-                logModel.append({ line: backend.progressMessage })
-            }
-        }
+        function onProgressLogReset() { root.reloadLog() }
+        function onProgressLogAppended(line) { logModel.append({ line: line }) }
     }
 
     ListModel { id: logModel }
@@ -59,7 +62,9 @@ ColumnLayout {
                     QQC2.Label {
                         text: backend.resetting
                             ? i18n("Layered packages are being removed")
-                            : i18n("%1 %2 is being downloaded", backend.osName, backend.pendingVersion)
+                            : backend.applying
+                              ? i18n("%1 %2 is being installed", backend.osName, backend.pendingVersion)
+                              : i18n("%1 %2 is being downloaded", backend.osName, backend.pendingVersion)
                         font.bold: true
                         font.pointSize: Math.round(Kirigami.Theme.defaultFont.pointSize * 1.05)
                         wrapMode: Text.WordWrap
@@ -92,6 +97,12 @@ ColumnLayout {
                     QQC2.Label {
                         visible: backend.hasPercent
                         text: backend.progressPercent + "%"
+                        opacity: 0.7
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    }
+                    QQC2.Label {
+                        visible: backend.timeRemaining !== ""
+                        text: (backend.hasPercent ? "· " : "") + backend.timeRemaining
                         opacity: 0.7
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
@@ -164,6 +175,14 @@ ColumnLayout {
         }
     }
 
+    QQC2.Label {
+        Layout.fillWidth: true
+        visible: !backend.resetting
+        text: i18n("You can close System Settings. The update continues in the background and the restart is up to you.")
+        wrapMode: Text.WordWrap
+        opacity: 0.7
+    }
+
     Item { Layout.fillHeight: true }
 
     // Cancel button row
@@ -174,7 +193,8 @@ ColumnLayout {
 
         QQC2.Button {
             icon.name: "dialog-cancel"
-            text: i18n("Cancel")
+            text: backend.cancelling ? i18n("Cancelling…") : i18n("Cancel")
+            enabled: !backend.cancelling
             onClicked: backend.cancelUpgrade()
         }
     }

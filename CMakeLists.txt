@@ -3,6 +3,8 @@ project(kcm_software_update VERSION 1.0.0)
 
 set(QT_MAJOR_VERSION 6)
 set(QT_DEFAULT_MAJOR_VERSION 6)
+# Lets clangd based IDEs resolve Qt and KF6 headers
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
