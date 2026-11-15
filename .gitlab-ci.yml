@@ -7,7 +7,7 @@ variables:
 
 rpm:
   stage: build
-  image: registry.fedoraproject.org/fedora:44
+  image: registry.fedoraproject.org/fedora:45
   rules:
     - if: $CI_COMMIT_TAG
   before_script:
@@ -28,7 +28,7 @@ rpm:
 
 release:
   stage: release
-  image: registry.fedoraproject.org/fedora:44
+  image: registry.fedoraproject.org/fedora:45
   needs:
     - rpm
   rules:
